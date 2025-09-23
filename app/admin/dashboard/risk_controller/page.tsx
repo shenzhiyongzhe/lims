@@ -510,7 +510,7 @@ export default function FrontUsersPage() {
                   name="username"
                   value={form.username}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入姓名"
                   autoComplete="username"
                 />
@@ -524,7 +524,7 @@ export default function FrontUsersPage() {
                   name="phone"
                   value={form.phone}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入手机号"
                   autoComplete="tel"
                 />
@@ -536,7 +536,7 @@ export default function FrontUsersPage() {
                   name="password"
                   value={form.password}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入初始密码"
                   autoComplete="new-password"
                 />
@@ -548,7 +548,7 @@ export default function FrontUsersPage() {
                   name="address"
                   value={form.address}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入地址"
                   autoComplete="street-address"
                 />

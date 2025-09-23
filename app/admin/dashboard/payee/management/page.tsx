@@ -2,68 +2,40 @@
 
 import { get, post } from "@/lib/http";
 import { useEffect, useMemo, useState } from "react";
+import SearchableSelect, {
+  SelectOption,
+} from "@/app/_components/SearchableSelect";
+import { useSearchableSelect } from "@/app/_hooks/useSearchableSelect";
 
-type QRCODETYPE = "wechat_pay" | "ali_pay";
 type AdminUser = {
-  payee_id: string;
+  payee_id: number;
+  admin_id: number;
   username: string;
-  phone: string;
-  qrcode_type: QRCODETYPE;
-  qrcode_url: string;
+  address: string;
+  payment_limit: number;
+  qrcode_number: number;
 };
 
 const initialUsers: AdminUser[] = [];
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>(initialUsers);
-  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [payeeLoading, setPayeeLoading] = useState(false);
+  const [payeeOptions, setPayeeOptions] = useState<SelectOption[]>([]);
+  const payeeSelect = useSearchableSelect();
+
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<AdminUser>({
-    payee_id: "",
+    payee_id: 0,
+    admin_id: 0,
     username: "",
-    phone: "",
-    qrcode_type: "wechat_pay",
-    qrcode_url: "",
+    address: "",
+    payment_limit: 0,
+    qrcode_number: 0,
   });
 
-  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  // 文件上传处理
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!form.username || !form.phone) {
-      alert("请先填写用户名和手机号");
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("username", form.username);
-      formData.append("phone", form.phone);
-      formData.append("qrcode_type", form.qrcode_type);
-
-      const res = await fetch("/api/payee/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await res.json();
-      if (res.ok) {
-        setForm((prev) => ({ ...prev, qrcode_url: result.url }));
-        alert("上传成功");
-      } else {
-        alert(result.message || "上传失败");
-      }
-    } catch (error) {
-      alert("上传失败");
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const startEdit = (user: AdminUser) => {
     setEditingId(user.payee_id);
@@ -73,11 +45,12 @@ export default function AdminUsersPage() {
   const cancelEdit = () => {
     setEditingId(null);
     setForm({
-      payee_id: "",
+      payee_id: 0,
+      admin_id: 0,
       username: "",
-      phone: "",
-      qrcode_type: "wechat_pay",
-      qrcode_url: "",
+      address: "",
+      payment_limit: 0,
+      qrcode_number: 0,
     });
   };
 
@@ -90,26 +63,25 @@ export default function AdminUsersPage() {
     cancelEdit();
   };
 
-  const remove = (id: string) => {
+  const remove = (id: number) => {
     setUsers((prev) => prev.filter((u) => u.payee_id !== id));
   };
 
   const addNew = async () => {
-    if (!form.username || !form.phone) {
-      alert("请填写用户名和手机号");
-      return;
-    }
-
     setSubmitting(true);
     try {
-      const res = await post("/api/payee", {
+      const res = await post("/api/payee/management", {
+        admin_id: form.admin_id,
         username: form.username,
-        phone: form.phone,
-        qrcode_type: form.qrcode_type,
-        qrcode_url: form.qrcode_url,
+        address: form.address,
+        payment_limit: form.payment_limit,
+        qrcode_number: form.qrcode_number,
       });
 
-      setUsers((prev) => [{ ...form, id: res.data.payee_id }, ...prev]);
+      setUsers((prev) => [
+        { ...form, payee_id: res.data.payee_id as number },
+        ...prev,
+      ]);
       cancelEdit();
       alert("添加成功");
     } catch (error: any) {
@@ -118,16 +90,30 @@ export default function AdminUsersPage() {
       setSubmitting(false);
     }
   };
-  const fetchPayeeUsers = async () => {
+
+  const handlePayeeSelect = (user: SelectOption) => {
+    const selectedUser = payeeSelect.handleSelect(user);
+    setForm((prev) => ({
+      ...prev,
+      admin_id: selectedUser.id as number,
+      username: selectedUser.username || "",
+    }));
+  };
+  const fetchAdminUsers = async () => {
+    setPayeeLoading(true);
     try {
-      const res = await get("/api/payee");
-      setUsers(res.data);
+      if (payeeOptions.length) return;
+      const res = await get("/api/admin");
+      setPayeeOptions(res.data);
     } catch (error) {
       console.log(error);
+    } finally {
+      setPayeeLoading(false);
     }
   };
+
   useEffect(() => {
-    fetchPayeeUsers();
+    fetchAdminUsers();
   }, []);
 
   return (
@@ -136,51 +122,51 @@ export default function AdminUsersPage() {
 
       <div className="bg-white border rounded-lg p-4 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <SearchableSelect
+            label="收款人"
+            value={payeeSelect.selectedValue}
+            placeholder="请选择收款人"
+            options={payeeOptions}
+            loading={payeeLoading}
+            query={payeeSelect.query}
+            onQueryChange={payeeSelect.handleQueryChange}
+            onSelect={handlePayeeSelect}
+            onToggle={payeeSelect.handleToggle}
+            onClose={payeeSelect.handleClose}
+            isOpen={payeeSelect.isOpen}
+          />
           <input
-            placeholder="用户名"
-            value={form.username}
+            placeholder="地址"
+            value={form.address}
             onChange={(e) =>
-              setForm((f) => ({ ...f, username: e.target.value }))
+              setForm((f) => ({ ...f, address: e.target.value }))
             }
             className="text-gray-600 border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
           />
           <input
-            placeholder="手机号"
-            value={form.phone}
-            onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            className="text-gray-600 border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={form.qrcode_type}
+            placeholder="收款限额"
+            value={form.payment_limit || ""}
             onChange={(e) =>
               setForm((f) => ({
                 ...f,
-                qrcode_type: e.target.value as QRCODETYPE,
+                payment_limit: Number(e.target.value) || 0,
               }))
             }
-            required
-            className="input-base"
-          >
-            <option value=""></option>
-            <option value="wechat_pay">微信支付</option>
-            <option value="ali_pay">支付宝支付</option>
-          </select>
-          {/* 文件上传区域 */}
-          <div className="flex flex-col">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              disabled={uploading || !form.username || !form.phone}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50"
-            />
-            {uploading && (
-              <p className="text-xs text-blue-600 mt-1">上传中...</p>
-            )}
-            {form.qrcode_url && (
-              <p className="text-xs text-green-600 mt-1">已上传二维码</p>
-            )}
-          </div>
+            className="text-gray-600 border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <input
+            placeholder="收款码数量"
+            value={form.qrcode_number || ""}
+            onChange={(e) =>
+              setForm((f) => ({
+                ...f,
+                qrcode_number: Number(e.target.value) || 0,
+              }))
+            }
+            className="text-gray-600 border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
           {editingId ? (
             <div className="flex gap-2">
               <button
@@ -216,10 +202,13 @@ export default function AdminUsersPage() {
                 用户名
               </th>
               <th className="text-left px-4 py-2 font-medium text-gray-600">
-                密码
+                地址
               </th>
               <th className="text-left px-4 py-2 font-medium text-gray-600">
-                收款二维码
+                收款限额
+              </th>
+              <th className="text-left px-4 py-2 font-medium text-gray-600">
+                收款码数量
               </th>
               <th className="text-right px-4 py-2 font-medium text-gray-600">
                 操作
@@ -233,18 +222,9 @@ export default function AdminUsersPage() {
                 className="border-t border-gray-200 text-gray-600"
               >
                 <td className="px-4 py-2">{u.username}</td>
-                <td className="px-4 py-2">{u.phone}</td>
-                <td className="px-4 py-2">
-                  {u.qrcode_url ? (
-                    <img
-                      src={u.qrcode_url}
-                      alt="二维码"
-                      className="w-16 h-16 object-cover border rounded"
-                    />
-                  ) : (
-                    <span className="text-gray-400">未上传</span>
-                  )}
-                </td>
+                <td className="px-4 py-2">{u.address}</td>
+                <td className="px-4 py-2">{u.payment_limit}</td>
+                <td className="px-4 py-2">{u.qrcode_number}</td>
                 <td className="px-4 py-2 text-right space-x-2">
                   <button
                     onClick={() => startEdit(u)}

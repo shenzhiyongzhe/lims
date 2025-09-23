@@ -9,6 +9,10 @@ export async function GET(req: Request) {
       select: {
         payee_id: true,
         username: true,
+        admin_id: true,
+        address: true,
+        payment_limit: true,
+        qrcode_number: true,
         createdAt: true,
       },
     });
@@ -25,19 +29,26 @@ export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req);
     const body = await req.json();
-    const { username, phone, qrcode_type, qrcode_url } = body || {};
+    const { admin_id, username, address, payment_limit, qrcode_number } =
+      body || {};
 
-    if (!username || !phone || !qrcode_type || !qrcode_url) {
+    if (
+      !admin_id ||
+      !username ||
+      !address ||
+      !payment_limit ||
+      !qrcode_number
+    ) {
       return NextResponse.json({ message: "缺少必要参数" }, { status: 400 });
     }
 
     const user = await prisma.payee.create({
       data: {
-        payee_id: auth.id,
+        admin_id,
         username,
-        phone,
-        qrcode_type,
-        qrcode_url,
+        address,
+        payment_limit,
+        qrcode_number,
       } as any,
     });
 
@@ -46,9 +57,6 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (e: any) {
-    if (e.code === "P2002") {
-      return NextResponse.json({ message: "手机号已存在" }, { status: 409 });
-    }
     return NextResponse.json({ message: "服务器错误" }, { status: 500 });
   }
 }

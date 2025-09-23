@@ -33,7 +33,7 @@ function buildQuery(params?: Record<string, any>) {
 
 async function coreFetch<T>(
   url: string,
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT",
   opts: RequestOptions = {}
 ): Promise<T> {
   const {
@@ -100,4 +100,12 @@ export function post<T = ApiResponse<any>>(
   options?: Omit<RequestOptions, "body">
 ) {
   return coreFetch<T>(url, "POST", { ...options, body });
+}
+
+export function put<T = ApiResponse<any>>(
+  url: string,
+  body?: any,
+  options?: Omit<RequestOptions, "body">
+) {
+  return coreFetch<T>(url, "PUT", { ...options, body });
 }

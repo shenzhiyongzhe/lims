@@ -42,6 +42,10 @@ model Admin {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @default(now())
 
+  // 添加关系
+  shareLinks   ShareLink[]
+  payees       Payee[]
+
   @@map("admins")
 }
 // 建议添加到 prisma/schema.prisma 中相应位置
@@ -74,6 +78,7 @@ model LoanAccount {
   status            LoanStatus  @default(pending)
   handling_fee      Decimal   @db.Decimal(10, 2)
   total_periods     Int
+  repaid_periods    Int       @default(0)
   monthly_repayment Decimal   @db.Decimal(10, 2)
   collector         String    @db.VarChar(10)
   payee             String    @db.VarChar(10)
@@ -127,13 +132,43 @@ model RepaymentRecord {
 
 
 model Payee {
-  payee_id     Int      @id @default(autoincrement())
-  username     String   @db.VarChar(10)
-  phone        String   @db.VarChar(11) @unique
-  qrcode_url   String   
-  qrcode_type  PaymentMethod @default(wechat_pay)    
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @default(now())
+  payee_id          Int      @id @default(autoincrement())
+  admin_id          Int
+  username          String   @db.VarChar(10)
+  address           String   @db.VarChar(100)
+  payment_limit     Int      @default(20000)
+  qrcode_number     Int      @default(5)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @default(now())
 
+  admin        Admin?   @relation(fields: [admin_id], references: [id])
+  qrcode       QrCode[]
   @@map("payees")
+}
+
+// 分享链接表
+model ShareLink {
+  share_id     String   @id @db.VarChar(8) // 8位短ID
+  schedule_ids String   @db.Text // JSON数组存储schedule_id列表
+  summary      String   @db.Text // JSON存储统计信息
+  expires_at   DateTime // 过期时间
+  created_at   DateTime @default(now())
+  updated_at   DateTime @default(now())
+  
+  // 可选：关联到创建者
+  created_by   Int? // 创建者ID（管理员ID）
+  admin        Admin? @relation(fields: [created_by], references: [id])
+
+  @@map("share_links")
+}
+model QrCode {
+  qrcode_id           Int      @id @default(autoincrement())
+  payee_id            Int
+  qrcode_url          String   @db.VarChar(255)
+  qrcode_type         PaymentMethod @default(wechat_pay)
+  active              Boolean      @default(true)
+  created_at          DateTime @default(now())
+  updated_at          DateTime @default(now())
+  payee        Payee? @relation(fields: [payee_id], references: [payee_id])
+  @@map("qr_codes")
 }

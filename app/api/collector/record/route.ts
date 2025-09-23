@@ -27,7 +27,7 @@ export async function GET(req: Request) {
         due_end_date: true,
         due_amount: true,
         status: true,
-        loan: { select: { username: true, collector: true } },
+        loan_account: { select: { username: true, collector: true } },
       },
     }),
   ]);

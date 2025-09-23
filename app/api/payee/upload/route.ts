@@ -3,24 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { requireAuth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
     const data = await req.formData();
     const file: File | null = data.get("file") as unknown as File;
-    const username = data.get("username") as string;
-    const phone = data.get("phone") as string;
+    const auth = requireAuth(req);
     const qrcode_type = data.get("qrcode_type") as string;
 
     if (!file) {
       return NextResponse.json({ message: "没有文件" }, { status: 400 });
     }
 
-    if (!username || !phone ||!qrcode_type) {
-      return NextResponse.json(
-        { message: "缺少必要参数" },
-        { status: 400 }
-      );
+    if (!auth.id || !qrcode_type) {
+      return NextResponse.json({ message: "缺少必要参数" }, { status: 400 });
     }
 
     // 验证文件类型
@@ -50,7 +47,7 @@ export async function POST(req: NextRequest) {
     // 根据用户名和手机号生成文件名
     const timestamp = Date.now();
     const extension = file.name.split(".").pop();
-    const filename = `${username}_${phone}${qrcode_type}_${timestamp}.${extension}`;
+    const filename = `${auth.id}_${qrcode_type}_${timestamp}.${extension}`;
     const filepath = join(uploadDir, filename);
 
     // 保存文件

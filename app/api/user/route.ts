@@ -4,7 +4,7 @@ import { prisma } from "@/prisma/prisma";
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const phone = searchParams.get("phone")?.trim() || "";
+    const search = searchParams.get("search")?.trim() || "";
     const page = Math.max(1, Number(searchParams.get("page") || 1));
     const pageSize = Math.min(
       100,
@@ -12,10 +12,9 @@ export async function GET(req: Request) {
     );
     const skip = (page - 1) * pageSize;
 
-    const where = phone
+    const where = search
       ? {
-          // 若仅支持精确匹配可用 equals: phone
-          phone: { contains: phone }, // 模糊查询，可能走不到索引
+          username: { contains: search },
         }
       : {};
 

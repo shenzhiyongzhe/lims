@@ -2,6 +2,10 @@
 
 import { useEffect, useState, useRef } from "react";
 import { get, post } from "@/lib/http";
+import SearchableSelect, {
+  SelectOption,
+} from "@/app/_components/SearchableSelect";
+import { useSearchableSelect } from "@/app/_hooks/useSearchableSelect";
 
 type LoanPlanForm = {
   user_id: number;
@@ -20,113 +24,6 @@ type LoanPlanForm = {
   company_cost: number;
   remark: string;
 };
-type UserItem = { id: number; username: string; phone: string };
-
-// 统一的下拉搜索组件
-interface SearchableSelectProps {
-  label: string;
-  value: string;
-  placeholder: string;
-  options: UserItem[];
-  loading: boolean;
-  query: string;
-  onQueryChange: (query: string) => void;
-  onSelect: (user: UserItem) => void;
-  onToggle: () => void;
-  onClose: () => void; // 添加关闭回调
-  isOpen: boolean;
-  disabled?: boolean;
-}
-function SearchableSelect({
-  label,
-  value,
-  placeholder,
-  options,
-  loading,
-  query,
-  onQueryChange,
-  onSelect,
-  onToggle,
-  isOpen,
-  onClose, // 接收关闭回调
-  disabled = false,
-}: SearchableSelectProps) {
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (!dropdownRef.current?.contains(e.target as Node)) {
-        onClose(); // 调用父组件的关闭函数
-      }
-    }
-    if (isOpen) document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [isOpen, onClose]);
-
-  const filtered = query
-    ? options.filter((u) =>
-        u.username?.toLowerCase().includes(query.toLowerCase())
-      )
-    : options;
-
-  return (
-    <div ref={dropdownRef} className="relative">
-      <label className="block text-sm text-gray-600 mb-1">{label}</label>
-      <button
-        type="button"
-        onClick={onToggle}
-        disabled={disabled}
-        className="input-base flex items-center justify-between disabled:opacity-50"
-      >
-        <span>{value || placeholder}</span>
-        <svg
-          className={`w-4 h-4 transition ${isOpen ? "rotate-180" : ""}`}
-          viewBox="0 0 24 24"
-          fill="none"
-        >
-          <path
-            d="M6 9l6 6 6-6"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg">
-          <div className="p-2 border-b">
-            <input
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              placeholder={`搜索${label}`}
-              className="input-base"
-            />
-          </div>
-          <div className="max-h-64 overflow-auto">
-            {loading ? (
-              <div className="p-3 text-sm text-gray-500">加载中...</div>
-            ) : filtered.length === 0 ? (
-              <div className="p-3 text-sm text-gray-500">暂无匹配用户</div>
-            ) : (
-              filtered.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => onSelect(u)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm text-gray-500"
-                >
-                  {u.username}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function AddLoanPlanPage() {
   const [form, setForm] = useState<LoanPlanForm>({
@@ -146,118 +43,127 @@ export default function AddLoanPlanPage() {
     company_cost: 0,
     remark: "",
   });
-  // 统一的状态管理
-  const [dropdowns, setDropdowns] = useState({
-    user: { isOpen: false, query: "", loading: false },
-    collector: { isOpen: false, query: "", loading: false },
-    payee: { isOpen: false, query: "", loading: false },
-  });
 
-  const [userOpen, setUserOpen] = useState(false);
-  const [userOptions, setUserOptions] = useState<UserItem[]>([]);
-  const [collectorOptions, setCollectorOptions] = useState<UserItem[]>([]);
-  const [payeeOptions, setPayeeOptions] = useState<UserItem[]>([]);
-  const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const [users, setUsers] = useState<SelectOption[]>([]);
+  const [collectorOptions, setCollectorOptions] = useState<SelectOption[]>([]);
+  const [payeeOptions, setPayeeOptions] = useState<SelectOption[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [collectorLoading, setCollectorLoading] = useState(false);
+  const [payeeLoading, setPayeeLoading] = useState(false);
 
-  const rolesMap = {
-    collector: "负责人",
-    payee: "收款人",
+  // 使用自定义Hook管理下拉选择状态
+  const userSelect = useSearchableSelect();
+  const collectorSelect = useSearchableSelect();
+  const payeeSelect = useSearchableSelect();
+
+  const fetchUsers = async (query: string) => {
+    setUsersLoading(true);
+    try {
+      const res = await get(`/api/user?search=${query}`);
+      setUsers(res.data || []);
+    } catch (error) {
+      console.error("获取用户列表失败:", error);
+    } finally {
+      setUsersLoading(false);
+    }
   };
 
-  // 加载用户数据
-  async function loadUsersOnce() {
-    if (userOptions.length) return;
-    setDropdowns((prev) => ({
-      ...prev,
-      user: { ...prev.user, loading: true },
-    }));
+  const fetchCollector = async (query: string) => {
+    setCollectorLoading(true);
     try {
-      const res = await get<{ data: UserItem[] }>("/api/user", {
-        params: { page: 1, pageSize: 500 },
-      });
-      setUserOptions(res.data || []);
-    } finally {
-      setDropdowns((prev) => ({
-        ...prev,
-        user: { ...prev.user, loading: false },
-      }));
-    }
-  }
-  async function loadAdminsOnce(type: keyof typeof rolesMap) {
-    if (type === "collector") {
       if (collectorOptions.length) return;
-    } else if (type === "payee") {
-      if (payeeOptions.length) return;
-    }
-    setDropdowns((prev) => ({
-      ...prev,
-      [type]: { ...prev[type], loading: true },
-    }));
-    try {
-      const res = await get<{ data: UserItem[] }>(
-        `/api/admin?role=${rolesMap[type]}`
-      );
-      if (type === "collector") {
-        setCollectorOptions(res.data || []);
-      } else if (type === "payee") {
-        setPayeeOptions(res.data || []);
-      }
+      const res = await get(`/api/admin?role=负责人`);
+      setCollectorOptions(res.data || []);
+    } catch (error) {
+      console.error("获取收款员列表失败:", error);
     } finally {
-      setDropdowns((prev) => ({
-        ...prev,
-        [type]: { ...prev[type], loading: false },
-      }));
+      setCollectorLoading(false);
     }
-  }
-  // 统一的下拉控制函数
-  const handleDropdownToggle = (type: keyof typeof dropdowns) => {
-    setDropdowns((prev) => ({
-      ...prev,
-      [type]: { ...prev[type], isOpen: !prev[type].isOpen },
-    }));
   };
-  // 在父组件中
-  const handleDropdownClose = (type: keyof typeof dropdowns) => {
-    setDropdowns((prev) => ({
-      ...prev,
-      [type]: { ...prev[type], isOpen: false },
-    }));
+
+  const fetchPayee = async (query: string) => {
+    setPayeeLoading(true);
+    try {
+      if (payeeOptions.length) return;
+      const res = await get(`/api/admin?role=收款人`);
+      setPayeeOptions(res.data || []);
+    } catch (error) {
+      console.error("获取收款员列表失败:", error);
+    } finally {
+      setPayeeLoading(false);
+    }
   };
-  const handleQueryChange = (type: keyof typeof dropdowns, query: string) => {
-    setDropdowns((prev) => ({
+
+  // async function loadAdminsOnce(type: keyof typeof rolesMap) {
+  //   if (type === "collector") {
+  //     if (collectorOptions.length) return;
+  //   } else if (type === "payee") {
+  //     if (payeeOptions.length) return;
+  //   }
+  //   setDropdowns((prev) => ({
+  //     ...prev,
+  //     [type]: { ...prev[type], loading: true },
+  //   }));
+  //   try {
+  //     const res = await get<{ data: UserItem[] }>(
+  //       `/api/admin?role=${rolesMap[type]}`
+  //     );
+  //     if (type === "collector") {
+  //       setCollectorOptions(res.data || []);
+  //     } else if (type === "payee") {
+  //       setPayeeOptions(res.data || []);
+  //     }
+  //   } finally {
+  //     setDropdowns((prev) => ({
+  //       ...prev,
+  //       [type]: { ...prev[type], loading: false },
+  //     }));
+  //   }
+  // }
+  // 处理用户选择
+  const handleUserSelect = (user: SelectOption) => {
+    const selectedUser = userSelect.handleSelect(user);
+    setForm((prev) => ({
       ...prev,
-      [type]: { ...prev[type], query },
+      user_id: selectedUser.id as number,
+      username: selectedUser.username || "",
     }));
   };
 
-  const handleUserSelect = (
-    user: UserItem,
-    type: "user" | "collector" | "payee"
-  ) => {
-    if (type === "user") {
-      setForm((f) => ({
-        ...f,
-        user_id: user.id,
-        username: user.username,
-      }));
-    } else {
-      setForm((f) => ({
-        ...f,
-        [type]: user.username,
-      }));
-    }
-    setDropdowns((prev) => ({
+  // 处理收款员选择
+  const handleCollectorSelect = (user: SelectOption) => {
+    const selectedUser = collectorSelect.handleSelect(user);
+    setForm((prev) => ({
       ...prev,
-      [type]: { ...prev[type], isOpen: false, query: "" },
+      collector: selectedUser.username || "",
+    }));
+  };
+
+  // 处理付款员选择
+  const handlePayeeSelect = (user: SelectOption) => {
+    const selectedUser = payeeSelect.handleSelect(user);
+    setForm((prev) => ({
+      ...prev,
+      payee: selectedUser.username || "",
     }));
   };
   useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (!dropdownRef.current?.contains(e.target as Node)) setUserOpen(false);
+    fetchUsers("");
+    fetchCollector("");
+    fetchPayee("");
+  }, []);
+  useEffect(() => {
+    if (userSelect.query) {
+      fetchUsers(userSelect.query);
     }
-    if (userOpen) document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [userOpen]);
+    if (collectorSelect.query) {
+      fetchCollector(collectorSelect.query);
+    }
+    if (payeeSelect.query) {
+      fetchPayee(payeeSelect.query);
+    }
+  }, [userSelect.query, collectorSelect.query, payeeSelect.query]);
+
   useEffect(() => {
     if (form.due_start_date && form.total_periods > 0) {
       const startDate = new Date(form.due_start_date);
@@ -289,20 +195,17 @@ export default function AddLoanPlanPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* 用户选择 */}
           <SearchableSelect
-            label="姓名"
-            value={form.username}
+            label="选择用户"
+            value={userSelect.selectedValue}
             placeholder="请选择用户"
-            options={userOptions}
-            loading={dropdowns.user.loading}
-            query={dropdowns.user.query}
-            onQueryChange={(query) => handleQueryChange("user", query)}
-            onSelect={(user) => handleUserSelect(user, "user")}
-            onToggle={() => {
-              loadUsersOnce();
-              handleDropdownToggle("user");
-            }}
-            onClose={() => handleDropdownClose("user")} // 传入关闭回调
-            isOpen={dropdowns.user.isOpen}
+            options={users}
+            loading={usersLoading}
+            query={userSelect.query}
+            onQueryChange={userSelect.handleQueryChange}
+            onSelect={handleUserSelect}
+            onToggle={userSelect.handleToggle}
+            onClose={userSelect.handleClose}
+            isOpen={userSelect.isOpen}
           />
           <div>
             <label className="block text-sm text-gray-600 mb-1">
@@ -318,7 +221,7 @@ export default function AddLoanPlanPage() {
                 }))
               }
               required
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入总金额"
             />
           </div>
@@ -330,7 +233,7 @@ export default function AddLoanPlanPage() {
               onChange={(e) =>
                 setForm((f) => ({ ...f, capital: Number(e.target.value) || 0 }))
               }
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入本金"
             />
           </div>
@@ -345,7 +248,7 @@ export default function AddLoanPlanPage() {
                   interest: Number(e.target.value) || 0,
                 }))
               }
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入利息"
             />
           </div>
@@ -360,7 +263,7 @@ export default function AddLoanPlanPage() {
                 setForm((f) => ({ ...f, due_start_date: e.target.value }))
               }
               required
-              className="input-base"
+              className="input-base-w"
             />
           </div>
           <div>
@@ -375,7 +278,7 @@ export default function AddLoanPlanPage() {
                 }))
               }
               required
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入总期数"
             />
           </div>
@@ -408,43 +311,37 @@ export default function AddLoanPlanPage() {
                 }))
               }
               required
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入每期还款金额"
             />
           </div>
           {/* 负责人选择 */}
           <SearchableSelect
             label="负责人"
-            value={form.collector}
+            value={collectorSelect.selectedValue}
             placeholder="请选择负责人"
             options={collectorOptions}
-            loading={dropdowns.collector.loading}
-            query={dropdowns.collector.query}
-            onQueryChange={(query) => handleQueryChange("collector", query)}
-            onSelect={(user) => handleUserSelect(user, "collector")}
-            onToggle={() => {
-              loadAdminsOnce("collector");
-              handleDropdownToggle("collector");
-            }}
-            onClose={() => handleDropdownClose("collector")}
-            isOpen={dropdowns.collector.isOpen}
+            loading={collectorLoading}
+            query={collectorSelect.query}
+            onQueryChange={collectorSelect.handleQueryChange}
+            onSelect={handleCollectorSelect}
+            onToggle={collectorSelect.handleToggle}
+            onClose={collectorSelect.handleClose}
+            isOpen={collectorSelect.isOpen}
           />
           {/* 收款人选择 */}
           <SearchableSelect
-            label="收款人"
-            value={form.payee}
-            placeholder="请选择收款人"
+            label="收款员"
+            value={payeeSelect.selectedValue}
+            placeholder="请选择收款员"
             options={payeeOptions}
-            loading={dropdowns.payee.loading}
-            query={dropdowns.payee.query}
-            onQueryChange={(query) => handleQueryChange("payee", query)}
-            onSelect={(user) => handleUserSelect(user, "payee")}
-            onToggle={() => {
-              loadAdminsOnce("payee");
-              handleDropdownToggle("payee");
-            }}
-            onClose={() => handleDropdownClose("payee")}
-            isOpen={dropdowns.payee.isOpen}
+            loading={payeeLoading}
+            query={payeeSelect.query}
+            onQueryChange={payeeSelect.handleQueryChange}
+            onSelect={handlePayeeSelect}
+            onToggle={payeeSelect.handleToggle}
+            onClose={payeeSelect.handleClose}
+            isOpen={payeeSelect.isOpen}
           />
           <div>
             <label className="block text-sm text-gray-600 mb-1">手续费</label>
@@ -457,7 +354,7 @@ export default function AddLoanPlanPage() {
                   handling_fee: Number(e.target.value) || 0,
                 }))
               }
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入手续费"
             />
           </div>
@@ -475,7 +372,7 @@ export default function AddLoanPlanPage() {
                 }))
               }
               required
-              className="input-base"
+              className="input-base-w"
               placeholder="请输入公司实际成本"
             />
           </div>
@@ -491,7 +388,7 @@ export default function AddLoanPlanPage() {
                 remark: e.target.value,
               }))
             }
-            className="input-base"
+            className="input-base-w"
           />
         </div>
         <div className="flex gap-3 justify-center">

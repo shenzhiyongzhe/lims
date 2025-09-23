@@ -7,7 +7,12 @@ const navItems = [
   { href: "/admin/dashboard/users", label: "后台用户管理", icon: "🏠" },
   { href: "/admin/dashboard/risk_controller", label: "风控人页面", icon: "🏠" },
   { href: "/admin/dashboard/collector", label: "负责人管理", icon: "🏠" },
-  { href: "/admin/dashboard/payee", label: "收款人页面", icon: "🏠" },
+  {
+    href: "/admin/dashboard/payee/management",
+    label: "添加收款人",
+    icon: "🏠",
+  },
+  { href: "/admin/dashboard/payee/qrcode", label: "添加收款码", icon: "🏠" },
   { href: "/admin/dashboard/stats", label: "统计", icon: "🏠" },
 ];
 

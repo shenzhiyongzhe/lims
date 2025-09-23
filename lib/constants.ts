@@ -16,3 +16,8 @@ export const COLLECTOR_ROLES = [
 ] as const;
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
+
+export const PAYMENT_METHODS = ["wechat_pay", "ali_pay"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+export const BASE_URL = "http://localhost:3000";

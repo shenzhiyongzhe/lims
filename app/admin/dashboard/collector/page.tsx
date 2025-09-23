@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { get, post } from "@/lib/http";
+import { get, post, put } from "@/lib/http";
 import Link from "next/link";
 
 type TabType = "all" | "overdue" | "paid" | "overtime" | "record";
@@ -73,6 +73,75 @@ export default function FrontUsersPage() {
     due_end_date: "",
     status: "",
   });
+  // 批量选择生成链接
+  const [batchMode, setBatchMode] = useState(false);
+  const [selectedSchedules, setSelectedSchedules] = useState<Set<number>>(
+    new Set()
+  );
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  // 新增批量操作相关函数
+  const handleBatchModeToggle = () => {
+    setBatchMode(!batchMode);
+    setSelectedSchedules(new Set());
+  };
+
+  const handleScheduleSelect = (scheduleId: number) => {
+    const newSelected = new Set(selectedSchedules);
+    if (newSelected.has(scheduleId)) {
+      newSelected.delete(scheduleId);
+    } else {
+      newSelected.add(scheduleId);
+    }
+    setSelectedSchedules(newSelected);
+  };
+
+  const handleSelectAll = () => {
+    if (selectedSchedules.size === schedules.length) {
+      setSelectedSchedules(new Set());
+    } else {
+      setSelectedSchedules(new Set(schedules.map((s: any) => s.schedule_id)));
+    }
+  };
+
+  const handleBatchGenerate = async () => {
+    if (selectedSchedules.size === 0) {
+      alert("请选择要生成链接的还款计划");
+      return;
+    }
+
+    setBatchGenerating(true);
+
+    try {
+      const ids = Array.from(selectedSchedules);
+      const share_res = await post(`/api/collector/schedules/share`, { ids });
+
+      if (share_res.data.shareUrl) {
+        try {
+          await navigator.clipboard.writeText(share_res.data.shareUrl);
+          alert(`已生成 个分享链接并复制到剪贴板`);
+        } catch (error) {
+          // 降级方案
+          const textArea = document.createElement("textarea");
+          textArea.value = share_res.data.shareUrl;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+          alert(`已生成 个分享链接并复制到剪贴板`);
+        }
+      }
+      // 重置选择状态
+      setSelectedSchedules(new Set());
+      setBatchMode(false);
+    } finally {
+      setBatchGenerating(false);
+    }
+  };
+
+  const handleBatchCancel = () => {
+    setSelectedSchedules(new Set());
+    setBatchMode(false);
+  };
   // 添加处理函数
   const handleEditSchedule = (record: any) => {
     setEditingSchedule(record);
@@ -106,22 +175,26 @@ export default function FrontUsersPage() {
 
   const handleGenerateLink = async (record: any) => {
     // 生成分享链接
-    const shareUrl = `${window.location.origin}/share/repayment/${record.schedule_id}`;
-    try {
-      // 复制到剪贴板
-      await navigator.clipboard.writeText(shareUrl);
-      alert("链接已复制到剪贴板");
-    } catch (error) {
-      // 降级方案
-      const textArea = document.createElement("textarea");
-      textArea.value = shareUrl;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textArea);
-      alert("链接已复制到剪贴板");
-    }
+    const share_res = await put(
+      `/api/collector/schedules/${record.schedule_id}`
+    );
+    alert(share_res.message);
+    // try {
+    //   // 复制到剪贴板
+    //   await navigator.clipboard.writeText(shareUrl);
+    //   alert("链接已复制到剪贴板");
+    // } catch (error) {
+    //   // 降级方案
+    //   const textArea = document.createElement("textarea");
+    //   textArea.value = shareUrl;
+    //   document.body.appendChild(textArea);
+    //   textArea.select();
+    //   document.execCommand("copy");
+    //   document.body.removeChild(textArea);
+    //   alert("链接已复制到剪贴板");
+    // }
   };
+
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((p) => ({ ...p, [name]: value }));
@@ -563,7 +636,7 @@ export default function FrontUsersPage() {
                   name="username"
                   value={form.username}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入姓名"
                   autoComplete="username"
                 />
@@ -577,7 +650,7 @@ export default function FrontUsersPage() {
                   name="phone"
                   value={form.phone}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入手机号"
                   autoComplete="tel"
                 />
@@ -589,7 +662,7 @@ export default function FrontUsersPage() {
                   name="password"
                   value={form.password}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入初始密码"
                   autoComplete="new-password"
                 />
@@ -601,7 +674,7 @@ export default function FrontUsersPage() {
                   name="address"
                   value={form.address}
                   onChange={onChange}
-                  className="input-base"
+                  className="input-base-w"
                   placeholder="请输入地址"
                   autoComplete="street-address"
                 />
@@ -644,50 +717,106 @@ export default function FrontUsersPage() {
             ) : schedules.length === 0 ? (
               <p className="text-gray-600 text-sm">暂无还款计划</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-max text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left">期数</th>
-                      <th className="px-4 py-2 text-left">应还金额</th>
-                      <th className="px-4 py-2 text-left">开始日期</th>
-                      <th className="px-4 py-2 text-left">结束日期</th>
-                      <th className="px-4 py-2 text-left">状态</th>
-                      <th className="px-4 py-2 text-left">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {schedules.map((s: any) => (
-                      <tr key={s.schedule_id} className="border-t">
-                        <td className="px-4 py-2">{s.period}</td>
-                        <td className="px-4 py-2">{s.due_amount}</td>
-                        <td className="px-4 py-2">
-                          {String(s.due_start_date).slice(0, 10)}
-                        </td>
-                        <td className="px-4 py-2">
-                          {String(s.due_end_date).slice(0, 10)}
-                        </td>
-                        <td className="px-4 py-2">{s.status}</td>
-                        <td className="px-4 py-2 text-right">
-                          <div className="flex gap-2 justify-end">
-                            <button
-                              onClick={() => handleEditSchedule(s)}
-                              className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
-                            >
-                              编辑
-                            </button>
-                            <button
-                              onClick={() => handleGenerateLink(s)}
-                              className="px-2 py-1 text-green-600 hover:bg-green-50 rounded text-xs"
-                            >
-                              生成链接
-                            </button>
-                          </div>
-                        </td>
+              <div className="space-y-4">
+                {/* 批量操作控制栏 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {!batchMode ? (
+                      <button
+                        onClick={handleBatchModeToggle}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                      >
+                        生成链接
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleSelectAll}
+                          className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                        >
+                          {selectedSchedules.size === schedules.length
+                            ? "取消全选"
+                            : "全选"}
+                        </button>
+                        <span className="text-sm text-gray-600">
+                          已选择 {selectedSchedules.size} 项
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {batchMode && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleBatchCancel}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+                        disabled={batchGenerating}
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={handleBatchGenerate}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
+                        disabled={
+                          batchGenerating || selectedSchedules.size === 0
+                        }
+                      >
+                        {batchGenerating ? "生成中..." : "确定生成"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {/* 表格 */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-max text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-center">期数</th>
+                        <th className="px-4 py-2 text-center">应还金额</th>
+                        <th className="px-4 py-2 text-center">截止日期</th>
+                        <th className="px-4 py-2 text-center">状态</th>
+                        <th className="px-4 py-2 text-center">操作</th>
+                        {batchMode && (
+                          <th className="px-4 py-2 text-center">生成链接</th>
+                        )}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {schedules.map((s: any) => (
+                        <tr key={s.schedule_id} className="border-t">
+                          <td className="px-4 py-2">{s.period}</td>
+                          <td className="px-4 py-2">{s.due_amount}</td>
+                          <td className="px-4 py-2">
+                            {String(s.due_end_date).slice(0, 10)}
+                          </td>
+                          <td className="px-4 py-2">{s.status}</td>
+                          <td className="px-4 py-2 text-right">
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handleEditSchedule(s)}
+                                className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
+                              >
+                                编辑
+                              </button>
+                            </div>
+                          </td>
+                          {batchMode && (
+                            <td className="px-4 py-2 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedSchedules.has(s.schedule_id)}
+                                onChange={() =>
+                                  handleScheduleSelect(s.schedule_id)
+                                }
+                                className="rounded"
+                              />
+                            </td>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -723,7 +852,7 @@ export default function FrontUsersPage() {
                       due_amount: Number(e.target.value) || 0,
                     }))
                   }
-                  className="input-base"
+                  className="input-base-w"
                 />
               </div>
               <div>
@@ -739,7 +868,7 @@ export default function FrontUsersPage() {
                       paid_amount: Number(e.target.value) || 0,
                     }))
                   }
-                  className="input-base"
+                  className="input-base-w"
                 />
               </div>
               <div>
@@ -755,7 +884,7 @@ export default function FrontUsersPage() {
                       due_end_date: e.target.value,
                     }))
                   }
-                  className="input-base"
+                  className="input-base-w"
                 />
               </div>
 
@@ -769,7 +898,7 @@ export default function FrontUsersPage() {
                       status: e.target.value,
                     }))
                   }
-                  className="input-base"
+                  className="input-base-w"
                 >
                   <option value="pending">待还款</option>
                   <option value="paid">已还款</option>
