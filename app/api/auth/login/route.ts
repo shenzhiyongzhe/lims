@@ -25,6 +25,22 @@ export async function POST(req: Request) {
       message: "登录成功",
       data: safe,
     });
+    if (user.role === "收款人") {
+      const payee = await prisma.payee.findFirst({
+        where: {
+          username: user.username,
+        },
+      });
+      if (payee) {
+        response.cookies.set("payee_id", JSON.stringify(payee.payee_id), {
+          path: "/",
+          maxAge: 7 * 24 * 60 * 60, // 7天
+          httpOnly: true, // 防止 XSS 攻击
+          secure: process.env.NODE_ENV === "production", // 生产环境使用 HTTPS
+          sameSite: "lax",
+        });
+      }
+    }
     response.cookies.set("admin", JSON.stringify(safe), {
       path: "/",
       maxAge: 7 * 24 * 60 * 60, // 7天

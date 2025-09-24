@@ -19,16 +19,6 @@ export async function GET(req: NextRequest) {
       const loanAccounts = await prisma.loanAccount.findMany({
         where: { collector },
         orderBy: { loan_id: "desc" },
-        select: {
-          loan_id: true,
-          user_id: true,
-          username: true,
-          loan_amount: true,
-          due_start_date: true,
-          due_end_date: true,
-          status: true,
-          collector: true,
-        },
       });
       // 获取所有唯一的 username
       const usernames = [...new Set(loanAccounts.map((loan) => loan.username))];
@@ -65,15 +55,6 @@ export async function GET(req: NextRequest) {
       const loanAccounts = await prisma.loanAccount.findMany({
         where: { collector },
         orderBy: { loan_id: "desc" },
-        select: {
-          loan_id: true,
-          username: true,
-          loan_amount: true,
-          due_start_date: true,
-          due_end_date: true,
-          status: true,
-          collector: true,
-        },
       });
 
       const loan_ids = loanAccounts.map((la) => la.loan_id);

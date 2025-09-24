@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-
+import { useSSE } from "@/app/_hooks/useSSE";
 const colorMap: { [key: string]: string } = {
   pending: "bg-yellow-100 text-yellow-800",
   active: "bg-blue-100 text-blue-800",
@@ -18,7 +18,14 @@ export default function ShareRepaymentPage() {
   const [error, setError] = useState<string>("");
   const [summary, setSummary] = useState<any>(null);
 
+  const [orderStatus, setOrderStatus] = useState<
+    "pending" | "grabbed" | "failed"
+  >("pending");
+  const [grabbedPayee, setGrabbedPayee] = useState<any>(null);
+
   const [form, setForm] = useState<any>({
+    user_id: 0,
+    loan_id: 0,
     payment_method: "wechat_pay",
     period: 1,
     amount: 0,
@@ -28,16 +35,91 @@ export default function ShareRepaymentPage() {
 
   const [qrcodeLoading, setQrcodeLoading] = useState(false);
   const [qrcode, setQrcode] = useState<any>(null);
-  const handleSubmit = () => {
+
+  // SSE连接 - 不自动连接，手动控制
+  const { isConnected, connect, disconnect } = useSSE({
+    autoConnect: false, // 不自动连接
+    onMessage: (message) => {
+      if (message.type === "order_grabbed") {
+        setOrderStatus("grabbed");
+        setGrabbedPayee(message.data);
+        // 抢单成功后获取二维码
+        fetchQrcode(message.data.payeeId);
+      }
+    },
+  });
+
+  const handleSubmit = async () => {
+    if (!form.amount || form.amount <= 0) {
+      setError("请输入有效金额");
+      return;
+    }
+
     setHaveSubmit(true);
-    fetchQrcode();
+    setOrderStatus("pending");
+
+    // 在提交订单时连接SSE
+    if (!isConnected) {
+      console.log("form.user_id", form.user_id);
+      const sseUrl = `/api/events?type=customer&user_id=${form.user_id}`;
+      connect(sseUrl);
+    }
+
+    // 发送订单到SSE服务
+    const orderData = {
+      orderId: `order_${Date.now()}_${form.user_id}`,
+      customerId: form.user_id,
+      customer: {
+        username: summary.user.username,
+        phone: summary.user.phone,
+        address: summary.user.address,
+      },
+      amount: form.amount,
+      payment_method: form.payment_method,
+      remark: form.remark,
+      loan_id: form.loan_id,
+    };
+
+    try {
+      const response = await fetch("/api/events", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          type: "submit_order",
+          data: orderData,
+        }),
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      // 等待抢单结果
+      setTimeout(() => {
+        if (orderStatus === "pending") {
+          setOrderStatus("failed");
+          setError("暂无收款人接单，请稍后再试");
+          // 超时后断开SSE连接
+          disconnect();
+        }
+      }, 60000); // 60秒超时
+    } catch (error: any) {
+      setError(error.message);
+      setOrderStatus("failed");
+      // 出错后断开SSE连接
+      disconnect();
+    }
   };
 
-  const fetchQrcode = async () => {
+  const fetchQrcode = async (payeeId: number) => {
     try {
       setQrcodeLoading(true);
+      const targetPayeeId = summary.payee_id;
       const response = await fetch(
-        `/api/payee/qrcode?payment_method=${form.payment_method}&active=true&payee_id=${summary.payee_id}`
+        `/api/payee/qrcode?payment_method=${form.payment_method}&active=true&payee_id=${targetPayeeId}`
       );
       const result = await response.json();
       if (!response.ok) {
@@ -50,6 +132,7 @@ export default function ShareRepaymentPage() {
       setQrcodeLoading(false);
     }
   };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -59,6 +142,12 @@ export default function ShareRepaymentPage() {
           throw new Error(result.message || "获取数据失败");
         }
         setSummary(result.summary);
+        setForm((prev: any) => ({
+          ...prev,
+          user_id: result.summary.user.id,
+          loan_id: result.summary.loan_id,
+        }));
+        console.log("result.summary.user.user_id", result.summary.user.id);
       } catch (error: any) {
         setError(error.message);
       } finally {
@@ -70,6 +159,13 @@ export default function ShareRepaymentPage() {
       fetchData();
     }
   }, [token]);
+
+  // 组件卸载时断开SSE连接
+  useEffect(() => {
+    return () => {
+      disconnect();
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -135,7 +231,7 @@ export default function ShareRepaymentPage() {
             <div className="flex  items-center justify-between">
               <div>3</div>
               <div className="bg-yellow-400 text-white px-2 py-1 rounded-md">
-                尊敬的{summary.user_lv}
+                尊敬的{summary.user.lv}
               </div>
             </div>
             <div className="flex items-center justify-center">
@@ -213,6 +309,36 @@ export default function ShareRepaymentPage() {
             </div>
           </div>
         </div>
+        {/* 订单状态显示 */}
+        {haveSubmit && (
+          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div className="flex items-center justify-center">
+              {orderStatus === "pending" && (
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <p className="text-blue-600">等待收款人抢单中...</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    连接状态: {isConnected ? "已连接" : "连接中..."}
+                  </p>
+                </div>
+              )}
+              {orderStatus === "grabbed" && grabbedPayee && (
+                <div className="text-center">
+                  <div className="text-green-500 text-2xl mb-2">✓</div>
+                  <p className="text-green-600 font-medium">
+                    订单已被 {grabbedPayee.payeeName} 接单
+                  </p>
+                </div>
+              )}
+              {orderStatus === "failed" && (
+                <div className="text-center">
+                  <div className="text-red-500 text-2xl mb-2">⚠</div>
+                  <p className="text-red-600">暂无收款人接单</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {haveSubmit && (
           <div className="bg-white rounded-lg shadow-md p-6 mb-6">
             {qrcodeLoading ? (

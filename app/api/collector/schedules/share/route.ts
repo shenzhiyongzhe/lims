@@ -129,8 +129,8 @@ export async function POST(req: NextRequest) {
       }
       // 准备存储的数据
       const summary = {
-        username: loan_account.user.username,
-        user_lv: loan_account.user.lv,
+        user: loan_account.user,
+        loan_id: loan_account.loan_id,
         total_periods: loan_account.total_periods,
         repaid_periods: loan_account.repaid_periods,
         total_due_amount: totalDueAmount.toFixed(2),

@@ -21,6 +21,7 @@ model User {
   updatedAt    DateTime @default(now())
 
   loanAccounts LoanAccount[]
+  orders       Order[]
 
   @@map("user")
 }
@@ -125,6 +126,7 @@ model RepaymentRecord {
   paid_amount     Decimal? @db.Decimal(10, 2)
   paid_at         String? @db.VarChar(19)
   payment_method  PaymentMethod @default(wechat_pay) 
+  payee_id        Int
   remark          String? @db.VarChar(255)
 
   @@map("repayment_records")
@@ -143,6 +145,7 @@ model Payee {
 
   admin        Admin?   @relation(fields: [admin_id], references: [id])
   qrcode       QrCode[]
+  orders       Order[]
   @@map("payees")
 }
 
@@ -171,4 +174,32 @@ model QrCode {
   updated_at          DateTime @default(now())
   payee        Payee? @relation(fields: [payee_id], references: [payee_id])
   @@map("qr_codes")
+}
+
+// 在现有schema基础上添加订单表
+model Order {
+  order_id        String   @id @default(cuid())
+  customer_id     Int
+  loan_id         Int
+  amount          Decimal  @db.Decimal(10, 2)
+  payment_method  PaymentMethod
+  remark          String?  @db.VarChar(255)
+  status          OrderStatus @default(pending)
+  payee_id        Int?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @default(now())
+  expires_at      DateTime
+
+  customer        User     @relation(fields: [customer_id], references: [id])
+  payee           Payee?   @relation(fields: [payee_id], references: [payee_id])
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  pending
+  grabbed
+  completed
+  expired
+  cancelled
 }
