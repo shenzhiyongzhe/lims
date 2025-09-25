@@ -1,13 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/prisma/prisma";
 import { requireAuth } from "@/lib/auth";
-import {
-  addDaysToBeijingDate,
-  createBeijingDate,
-  formatDateForAPI,
-  getCurrentBeijingDateObject,
-  toBeijingDateTime,
-} from "@/lib/tool";
+import { formatDateForAPI, getCurrentBeijingDateObject } from "@/lib/tool";
 
 export async function GET(req: Request) {
   try {
@@ -31,7 +25,7 @@ export async function GET(req: Request) {
       prisma.loanAccount.count({ where }),
       prisma.loanAccount.findMany({
         where,
-        orderBy: { loan_id: "desc" },
+        orderBy: { id: "desc" },
         skip,
         take: pageSize,
       }),
@@ -50,27 +44,20 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      username,
       due_start_date,
       total_periods,
       collector,
       payee,
-      monthly_repayment,
+      daily_repayment,
       capital,
       interest,
     } = body || {};
 
-    if (
-      !username ||
-      !due_start_date ||
-      !total_periods ||
-      !collector ||
-      !payee
-    ) {
+    if (!due_start_date || !total_periods || !collector || !payee) {
       return NextResponse.json({ message: "缺少必要参数" }, { status: 400 });
     }
     const authUser = requireAuth(req);
-    body.risk_controller = authUser.username;
+    body.created_by = authUser.id;
 
     const startDateStr = body.due_start_date;
     const startDate = new Date(startDateStr + "T06:00:00+08:00");
@@ -86,17 +73,17 @@ export async function POST(req: NextRequest) {
       });
 
       const periods = Number(total_periods) || 0;
-      const perAmount = monthly_repayment ?? created.monthly_repayment ?? 0;
+      const perAmount = daily_repayment ?? created.daily_repayment ?? 0;
 
       const rows = Array.from({ length: periods }).map((_, idx) => {
-        const d = created.due_start_date;
+        const d = new Date(created.due_start_date);
         d.setDate(d.getDate() + idx);
         d.setHours(6, 0, 0, 0);
         const end = new Date(d);
         end.setDate(end.getDate() + 1);
         end.setHours(6, 0, 0, 0);
         return {
-          loan_id: created.loan_id,
+          loan_id: created.id,
           period: idx + 1,
           due_start_date: d,
           due_end_date: end,

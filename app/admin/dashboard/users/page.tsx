@@ -3,7 +3,7 @@
 import { post, get } from "@/lib/http";
 import { useEffect, useMemo, useState } from "react";
 
-type Role = "管理员" | "财务员" | "风控人" | "负责人" | "收款人";
+type Role = "管理员" | "财务员" | "风控人" | "负责人" | "收款人" | "打款人";
 
 type AdminUser = {
   id: number;
@@ -25,7 +25,7 @@ export default function AdminUsersPage() {
   });
 
   const roles: Role[] = useMemo(
-    () => ["管理员", "财务员", "风控人", "负责人", "收款人"],
+    () => ["管理员", "财务员", "风控人", "负责人", "收款人", "打款人"],
     []
   );
 
@@ -59,7 +59,7 @@ export default function AdminUsersPage() {
     if (!form.username || !form.password) return;
     try {
       const res = await post("/api/admin", form);
-      setUsers((prev) => [{ ...form }, ...prev]);
+      await getAllLoan();
       cancelEdit();
       alert(res.message);
     } catch (error) {
@@ -176,7 +176,7 @@ export default function AdminUsersPage() {
             <tbody>
               {users.map((u) => (
                 <tr
-                  key={u.phone}
+                  key={u.id + u.username}
                   className="border-t border-gray-200 text-gray-600"
                 >
                   <td className="px-4 py-2">{u.username}</td>

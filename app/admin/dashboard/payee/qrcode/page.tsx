@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { get, post, put } from "@/lib/http";
 
 interface QRCodeData {
-  qrcode_id: number;
+  id: number;
   qrcode_url: string;
   qrcode_type: "wechat_pay" | "ali_pay";
   active: boolean;
@@ -223,7 +223,7 @@ export default function QRCodeManagementPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {qrCodes.map((qrCode) => (
-                  <tr key={qrCode.qrcode_id} className="hover:bg-gray-50">
+                  <tr key={qrCode.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
@@ -236,7 +236,7 @@ export default function QRCodeManagementPage() {
                         />
                         <div className="ml-3">
                           <div className="text-sm font-medium text-gray-900">
-                            二维码 #{qrCode.qrcode_id}
+                            二维码 #{qrCode.id}
                           </div>
                           <div className="text-xs text-gray-500">
                             点击查看大图
@@ -274,7 +274,7 @@ export default function QRCodeManagementPage() {
                       <div className="flex space-x-2">
                         <button
                           onClick={() =>
-                            handleToggleActive(qrCode.qrcode_id, qrCode.active)
+                            handleToggleActive(qrCode.id, qrCode.active)
                           }
                           className={`px-3 py-1 text-xs rounded-md transition-colors ${
                             qrCode.active
@@ -285,7 +285,7 @@ export default function QRCodeManagementPage() {
                           {qrCode.active ? "禁用" : "启用"}
                         </button>
                         <button
-                          onClick={() => handleDelete(qrCode.qrcode_id)}
+                          onClick={() => handleDelete(qrCode.id)}
                           className="px-3 py-1 text-xs bg-red-100 text-red-800 rounded-md hover:bg-red-200 transition-colors"
                         >
                           删除

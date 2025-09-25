@@ -117,9 +117,8 @@ export default function ShareRepaymentPage() {
   const fetchQrcode = async (payeeId: number) => {
     try {
       setQrcodeLoading(true);
-      const targetPayeeId = summary.payee_id;
       const response = await fetch(
-        `/api/payee/qrcode?payment_method=${form.payment_method}&active=true&payee_id=${targetPayeeId}`
+        `/api/payee/qrcode?payment_method=${form.payment_method}&active=true&payee_id=${payeeId}`
       );
       const result = await response.json();
       if (!response.ok) {

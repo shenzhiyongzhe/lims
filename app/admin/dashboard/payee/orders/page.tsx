@@ -4,22 +4,11 @@ import { useState, useEffect } from "react";
 import OrderNotification from "@/app/_components/OrderNotification";
 
 export default function PayeeOrdersPage() {
-  const [payeeId, setPayeeId] = useState<number>(0);
   const [orders, setOrders] = useState<any[]>([]);
 
-  const getPayeeId = async () => {
-    const response = await fetch("/api/payee/get_id");
-    const data = await response.json();
-    setPayeeId(data.data.payee_id);
-  };
-  useEffect(() => {
-    getPayeeId();
-  }, []);
-
-  const handleOrderGrabbed = (orderId: string, payeeId: number) => {
+  const handleOrderGrabbed = (orderId: string) => {
     // 处理抢单成功的逻辑
-    console.log(`Order ${orderId} grabbed by payee ${payeeId}`);
-    setPayeeId(payeeId);
+    console.log(`Order ${orderId} grabbed successfully`);
     // 可以在这里添加订单到列表等操作
   };
 
@@ -78,10 +67,7 @@ export default function PayeeOrdersPage() {
       </div>
 
       {/* 订单通知组件 */}
-      <OrderNotification
-        payeeId={payeeId}
-        onOrderGrabbed={handleOrderGrabbed}
-      />
+      <OrderNotification onOrderGrabbed={handleOrderGrabbed} />
     </div>
   );
 }

@@ -17,12 +17,10 @@ interface OrderData {
 }
 
 interface OrderNotificationProps {
-  payeeId: number;
-  onOrderGrabbed: (orderId: string, payeeId: number) => void;
+  onOrderGrabbed: (orderId: string) => void;
 }
 
 export default function OrderNotification({
-  payeeId,
   onOrderGrabbed,
 }: OrderNotificationProps) {
   const [currentOrder, setCurrentOrder] = useState<OrderData | null>(null);
@@ -40,6 +38,7 @@ export default function OrderNotification({
       if (message.type === "new_order") {
         setCurrentOrder(message.data);
         setGrabResult(null);
+        console.log("new_order", message.data);
       } else if (message.type === "connected") {
         console.log("SSE connected:", message.data);
       }
@@ -61,7 +60,6 @@ export default function OrderNotification({
           type: "grab_order",
           data: {
             orderId: currentOrder.orderId,
-            payeeId,
           },
         }),
       });
@@ -71,7 +69,7 @@ export default function OrderNotification({
 
       if (result.success) {
         setCurrentOrder(null);
-        onOrderGrabbed(result.orderId, payeeId);
+        onOrderGrabbed(result.orderId);
       }
     } catch (error) {
       setGrabResult({ success: false, message: "抢单失败" });

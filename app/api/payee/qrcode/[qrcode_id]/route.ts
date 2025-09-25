@@ -31,11 +31,11 @@ export async function GET(req: NextRequest, { params }: Ctx) {
     // 查找二维码记录
     const qrCode = await prisma.qrCode.findFirst({
       where: {
-        qrcode_id: qrcodeId,
-        payee_id: payee.payee_id, // 确保只能访问自己的二维码
+        id: qrcodeId,
+        payee_id: payee.id, // 确保只能访问自己的二维码
       },
       select: {
-        qrcode_id: true,
+        id: true,
         qrcode_url: true,
         qrcode_type: true,
         active: true,
@@ -85,8 +85,8 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     // 检查二维码是否存在且属于当前用户
     const existingQrCode = await prisma.qrCode.findFirst({
       where: {
-        qrcode_id: qrcodeId,
-        payee_id: payee.payee_id,
+        id: qrcodeId,
+        payee_id: payee.id,
       },
     });
 
@@ -120,11 +120,11 @@ export async function PUT(req: NextRequest, { params }: Ctx) {
     // 更新二维码
     const updatedQrCode = await prisma.qrCode.update({
       where: {
-        qrcode_id: qrcodeId,
+        id: qrcodeId,
       },
       data: updateData,
       select: {
-        qrcode_id: true,
+        id: true,
         qrcode_url: true,
         qrcode_type: true,
         active: true,
@@ -168,8 +168,8 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
     // 检查二维码是否存在且属于当前用户
     const existingQrCode = await prisma.qrCode.findFirst({
       where: {
-        qrcode_id: qrcodeId,
-        payee_id: payee.payee_id,
+        id: qrcodeId,
+        payee_id: payee.id,
       },
     });
 
@@ -180,7 +180,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
     // 删除二维码
     await prisma.qrCode.delete({
       where: {
-        qrcode_id: qrcodeId,
+        id: qrcodeId,
       },
     });
 

@@ -97,7 +97,25 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "grab_order") {
-      const { payeeId, orderId } = data;
+      const { orderId } = data;
+      // 从cookie获取payee_id
+      const cookies = req.cookies;
+      const payeeId = cookies.get("payee_id")?.value;
+
+      if (!payeeId) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            message: "缺少收款人ID",
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+
+      console.log("grab_order request data:", { payeeId, orderId, data });
       const result = await handleGrabOrder(Number(payeeId), orderId);
 
       return new Response(JSON.stringify(result), {
@@ -158,7 +176,7 @@ async function calculatePayeePriority(orderData: any) {
     // 1. 检查历史记录优先级（立即通知）
     const historyCount = await prisma.repaymentRecord.count({
       where: {
-        payee_id: payee.payee_id,
+        payee_id: payee.id,
         user_id: orderData.customerId,
       },
     });
@@ -182,7 +200,7 @@ async function calculatePayeePriority(orderData: any) {
 
     const todayAmount = await prisma.repaymentRecord.aggregate({
       where: {
-        payee_id: payee.payee_id,
+        payee_id: payee.id,
         paid_at: {
           gte: today.toISOString().slice(0, 19),
           lt: tomorrow.toISOString().slice(0, 19),
@@ -220,7 +238,7 @@ async function broadcastOrder(orderData: any) {
 
   for (const { payee, delay } of priorities) {
     setTimeout(() => {
-      const connectionId = payeeConnections.get(payee.payee_id);
+      const connectionId = payeeConnections.get(payee.id);
       if (connectionId) {
         const controller = sseConnections.get(connectionId);
         if (controller) {
@@ -244,6 +262,8 @@ async function broadcastOrder(orderData: any) {
 
 // 处理抢单请求
 async function handleGrabOrder(payeeId: number, orderId: string) {
+  console.log("handleGrabOrder called with:", { payeeId, orderId });
+
   const order = pendingOrders.get(orderId);
   if (!order) {
     return { success: false, message: "订单不存在或已过期" };
@@ -269,7 +289,7 @@ async function handleGrabOrder(payeeId: number, orderId: string) {
   });
 
   const payee = await prisma.payee.findUnique({
-    where: { payee_id: payeeId },
+    where: { id: payeeId },
   });
 
   if (!payee) {

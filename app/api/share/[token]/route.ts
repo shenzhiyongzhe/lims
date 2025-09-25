@@ -27,7 +27,7 @@ export async function GET(req: Request, { params }: Ctx) {
     // 查询还款计划详情
     const schedules = await prisma.repaymentSchedule.findMany({
       where: {
-        schedule_id: {
+        id: {
           in: scheduleIds,
         },
       },

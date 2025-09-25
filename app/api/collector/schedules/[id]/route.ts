@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: Ctx) {
 
   try {
     const schedule = await prisma.repaymentSchedule.findUnique({
-      where: { schedule_id },
+      where: { id: schedule_id },
       include: {
         loan_account: {
           include: {
@@ -48,7 +48,7 @@ export async function POST(req: Request, { params }: Ctx) {
     const { due_amount, due_end_date, status } = body;
 
     const updated = await prisma.repaymentSchedule.update({
-      where: { schedule_id },
+      where: { id: schedule_id },
       data: {
         ...(due_amount && { due_amount }),
         ...(due_end_date && { due_end_date: new Date(due_end_date) }),
@@ -77,7 +77,7 @@ export async function PUT(req: Request, { params }: Ctx) {
   try {
     // 获取还款计划数据
     const schedule = await prisma.repaymentSchedule.findUnique({
-      where: { schedule_id },
+      where: { id: schedule_id },
       include: {
         loan_account: {
           include: {
@@ -94,7 +94,7 @@ export async function PUT(req: Request, { params }: Ctx) {
     // 生成分享token (包含schedule_id和过期时间)
     const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3小时后过期
     const tokenData = {
-      schedule_id,
+      id: schedule_id,
       expires_at: expiresAt.getTime(),
     };
 

@@ -8,7 +8,7 @@ import SearchableSelect, {
 import { useSearchableSelect } from "@/app/_hooks/useSearchableSelect";
 
 type AdminUser = {
-  payee_id: number;
+  id: number;
   admin_id: number;
   username: string;
   address: string;
@@ -27,7 +27,7 @@ export default function AdminUsersPage() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<AdminUser>({
-    payee_id: 0,
+    id: 0,
     admin_id: 0,
     username: "",
     address: "",
@@ -38,14 +38,14 @@ export default function AdminUsersPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const startEdit = (user: AdminUser) => {
-    setEditingId(user.payee_id);
+    setEditingId(user.id);
     setForm(user);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setForm({
-      payee_id: 0,
+      id: 0,
       admin_id: 0,
       username: "",
       address: "",
@@ -56,15 +56,13 @@ export default function AdminUsersPage() {
 
   const saveEdit = () => {
     setUsers((prev) =>
-      prev.map((u) =>
-        u.payee_id === editingId ? { ...form, payee_id: u.payee_id } : u
-      )
+      prev.map((u) => (u.id === editingId ? { ...form, id: u.id } : u))
     );
     cancelEdit();
   };
 
   const remove = (id: number) => {
-    setUsers((prev) => prev.filter((u) => u.payee_id !== id));
+    setUsers((prev) => prev.filter((u) => u.id !== id));
   };
 
   const addNew = async () => {
@@ -78,10 +76,7 @@ export default function AdminUsersPage() {
         qrcode_number: form.qrcode_number,
       });
 
-      setUsers((prev) => [
-        { ...form, payee_id: res.data.payee_id as number },
-        ...prev,
-      ]);
+      setUsers((prev) => [{ ...form, id: res.data.id as number }, ...prev]);
       cancelEdit();
       alert("添加成功");
     } catch (error: any) {
@@ -99,12 +94,16 @@ export default function AdminUsersPage() {
       username: selectedUser.username || "",
     }));
   };
-  const fetchAdminUsers = async () => {
+  const fetchPayeeOptions = async () => {
+    const res = await get("/api/admin?role=收款人");
+    setPayeeOptions(res.data);
+  };
+  const fetchPayeeUsers = async () => {
     setPayeeLoading(true);
     try {
       if (payeeOptions.length) return;
-      const res = await get("/api/admin");
-      setPayeeOptions(res.data);
+      const res = await get("/api/payee/management");
+      setUsers(res.data);
     } catch (error) {
       console.log(error);
     } finally {
@@ -113,7 +112,8 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
-    fetchAdminUsers();
+    fetchPayeeUsers();
+    fetchPayeeOptions();
   }, []);
 
   return (
@@ -217,10 +217,7 @@ export default function AdminUsersPage() {
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr
-                key={u.payee_id}
-                className="border-t border-gray-200 text-gray-600"
-              >
+              <tr key={u.id} className="border-t border-gray-200 text-gray-600">
                 <td className="px-4 py-2">{u.username}</td>
                 <td className="px-4 py-2">{u.address}</td>
                 <td className="px-4 py-2">{u.payment_limit}</td>
@@ -233,7 +230,7 @@ export default function AdminUsersPage() {
                     编辑
                   </button>
                   <button
-                    onClick={() => remove(u.payee_id)}
+                    onClick={() => remove(u.id)}
                     className="px-2 py-1 text-red-600 hover:bg-red-50 rounded"
                   >
                     删除

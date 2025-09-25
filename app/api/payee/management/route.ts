@@ -5,9 +5,9 @@ import { requireAuth } from "@/lib/auth";
 export async function GET(req: Request) {
   try {
     const users = await prisma.payee.findMany({
-      orderBy: { payee_id: "desc" },
+      orderBy: { id: "desc" },
       select: {
-        payee_id: true,
+        id: true,
         username: true,
         admin_id: true,
         address: true,

@@ -18,16 +18,17 @@ export async function GET(req: NextRequest) {
       // 先查 LoanAccount 数据
       const loanAccounts = await prisma.loanAccount.findMany({
         where: { collector },
-        orderBy: { loan_id: "desc" },
+        orderBy: { id: "desc" },
       });
       // 获取所有唯一的 username
-      const usernames = [...new Set(loanAccounts.map((loan) => loan.username))];
+      const usernames = [...new Set(loanAccounts.map((loan) => loan.user_id))];
       // 根据 username 查询 User 数据
       const users = await prisma.user.findMany({
         where: {
-          username: { in: usernames },
+          id: { in: usernames },
         },
         select: {
+          id: true,
           username: true,
           phone: true,
           address: true,
@@ -37,9 +38,10 @@ export async function GET(req: NextRequest) {
       // 按用户分组，构建嵌套结构
       const result = users.map((user) => {
         const userLoans = loanAccounts.filter(
-          (loan) => loan.username === user.username
+          (loan) => loan.user_id === user.id
         );
         return {
+          id: user.id,
           username: user.username,
           phone: user.phone,
           address: user.address,
@@ -54,15 +56,15 @@ export async function GET(req: NextRequest) {
     } else if (["overtime", "overdue", "paid"].includes(status)) {
       const loanAccounts = await prisma.loanAccount.findMany({
         where: { collector },
-        orderBy: { loan_id: "desc" },
+        orderBy: { id: "desc" },
       });
 
-      const loan_ids = loanAccounts.map((la) => la.loan_id);
+      const loan_ids = loanAccounts.map((la) => la.id);
       const rows = await prisma.repaymentSchedule.findMany({
         where: { loan_id: { in: loan_ids }, status },
         orderBy: [{ period: "asc" }],
         select: {
-          schedule_id: true,
+          id: true,
           loan_id: true,
           period: true,
           due_start_date: true,
@@ -73,7 +75,7 @@ export async function GET(req: NextRequest) {
           status: true,
           paid_amount: true,
           paid_at: true,
-          loan_account: { select: { username: true } },
+          loan_account: { select: { user_id: true } },
         },
       });
       return NextResponse.json({

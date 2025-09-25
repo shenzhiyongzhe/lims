@@ -10,7 +10,6 @@ datasource db {
 model User {
   id           Int      @id @default(autoincrement())
   username     String   @db.VarChar(10)
-  id_card      String?  @db.VarChar(10)
   password     String   @db.VarChar(32)
   phone        String   @db.VarChar(11) @unique
   address      String   @db.VarChar(100)
@@ -23,7 +22,7 @@ model User {
   loanAccounts LoanAccount[]
   orders       Order[]
 
-  @@map("user")
+  @@map("users")
 }
 
 // 复用的枚举（还款状态）
@@ -33,6 +32,7 @@ enum ManagementRoles {
   风控人
   负责人
   收款人
+  打款人
 }
 model Admin {
   id           Int      @id @default(autoincrement())
@@ -49,15 +49,9 @@ model Admin {
 
   @@map("admins")
 }
-// 建议添加到 prisma/schema.prisma 中相应位置
 
 // 复用的枚举（还款状态）
-enum LoanStatus {
-  pending
-  active
-  paid
-  overdue
-}
+
 enum RepaymentStatus {
   pending
   active
@@ -66,27 +60,26 @@ enum RepaymentStatus {
   overdue
 }
 model LoanAccount {
-  loan_id           Int       @id @default(autoincrement()) @db.Int
+  id                Int       @id @default(autoincrement()) @db.Int
   user_id           Int      
-  username          String    @db.VarChar(10)
   loan_amount       Decimal   @db.Decimal(10, 2) 
   receiving_amount  Decimal?  @db.Decimal(10, 2)
-  payment_amount    Decimal?  @db.Decimal(10, 2)
   capital           Decimal   @db.Decimal(10, 2) 
   interest          Decimal   @db.Decimal(10, 2) 
   due_start_date    DateTime
   due_end_date      DateTime
-  status            LoanStatus  @default(pending)
+  status            RepaymentStatus  @default(pending)
   handling_fee      Decimal   @db.Decimal(10, 2)
   total_periods     Int
   repaid_periods    Int       @default(0)
-  monthly_repayment Decimal   @db.Decimal(10, 2)
+  daily_repayment   Decimal   @db.Decimal(10, 2)
+  risk_controller   String    @db.VarChar(10)
   collector         String    @db.VarChar(10)
   payee             String    @db.VarChar(10)
-  risk_controller   String    @db.VarChar(10)
+  lender            String    @db.VarChar(10)
   company_cost      Int       @default(0)
-  remark            String?   @db.VarChar(255)
   created_at        DateTime
+  created_by        Int 
   updated_at        DateTime? 
 
   // 关系
@@ -97,7 +90,7 @@ model LoanAccount {
 }
 
 model RepaymentSchedule {
-  schedule_id    Int              @id @default(autoincrement())
+  id             Int              @id @default(autoincrement())
   loan_id        Int
   period         Int
   due_start_date DateTime
@@ -110,7 +103,7 @@ model RepaymentSchedule {
   paid_at        DateTime?
 
   // 外键关系到 LoanAccount
-  loan_account LoanAccount @relation(fields: [loan_id], references: [loan_id], onDelete: Cascade, onUpdate: Cascade)
+  loan_account LoanAccount @relation(fields: [loan_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@map("repayment_schedules")
 }
@@ -120,7 +113,7 @@ enum PaymentMethod{
   ali_pay
 }
 model RepaymentRecord {
-  record_id       Int @id @default(autoincrement())
+  id              Int @id @default(autoincrement())
   loan_id         Int 
   user_id         Int
   paid_amount     Decimal? @db.Decimal(10, 2)
@@ -134,7 +127,7 @@ model RepaymentRecord {
 
 
 model Payee {
-  payee_id          Int      @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   admin_id          Int
   username          String   @db.VarChar(10)
   address           String   @db.VarChar(100)
@@ -165,14 +158,14 @@ model ShareLink {
   @@map("share_links")
 }
 model QrCode {
-  qrcode_id           Int      @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   payee_id            Int
   qrcode_url          String   @db.VarChar(255)
   qrcode_type         PaymentMethod @default(wechat_pay)
   active              Boolean      @default(true)
   created_at          DateTime @default(now())
   updated_at          DateTime @default(now())
-  payee        Payee? @relation(fields: [payee_id], references: [payee_id])
+  payee        Payee? @relation(fields: [payee_id], references: [id])
   @@map("qr_codes")
 }
 
@@ -191,7 +184,7 @@ model Order {
   expires_at      DateTime
 
   customer        User     @relation(fields: [customer_id], references: [id])
-  payee           Payee?   @relation(fields: [payee_id], references: [payee_id])
+  payee           Payee?   @relation(fields: [payee_id], references: [id])
 
   @@map("orders")
 }

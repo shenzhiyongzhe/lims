@@ -1,31 +1,40 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { get, post, put } from "@/lib/http";
+import { get, post } from "@/lib/http";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type TabType = "all" | "overdue" | "paid" | "overtime" | "record";
 
 type Customer = {
-  id: string;
+  id: number;
   username: string;
   phone: string;
   address: string;
   lv: string;
   loanAccount: {
-    id: string;
-    total: number;
-    startDate: string;
-    endDate: string;
-
-    installments: {
-      period: number;
-      amount: number;
-      status: "已还" | "未还" | "逾期" | "未开始";
-      repayStartTime: string; // HH:mm
-      repayEndTime: string; // HH:mm
-      repayTime?: string; // YYYY-MM-DD HH:mm
-    }[];
+    id: number;
+    user_id: number;
+    loan_amount: string;
+    receiving_amount: string | null;
+    capital: string;
+    interest: string;
+    due_start_date: string;
+    due_end_date: string;
+    status: string;
+    handling_fee: string;
+    total_periods: number;
+    repaid_periods: number;
+    daily_repayment: string;
+    risk_controller: string;
+    collector: string;
+    payee: string;
+    lender: string;
+    company_cost: number;
+    created_at: string;
+    created_by: number;
+    updated_at: string | null;
   }[];
 };
 
@@ -37,8 +46,8 @@ type Tab = {
   loading: boolean;
 };
 
-const initialCustomers: Customer[] = [];
 export default function FrontUsersPage() {
+  const router = useRouter();
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: "record-default",
@@ -63,138 +72,6 @@ export default function FrontUsersPage() {
     address: "",
   });
 
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [schedules, setSchedules] = useState<any[]>([]);
-  const [editingSchedule, setEditingSchedule] = useState<any>(null);
-  const [editScheduleForm, setEditScheduleForm] = useState({
-    due_amount: 0,
-    paid_amount: 0,
-    due_end_date: "",
-    status: "",
-  });
-  // 批量选择生成链接
-  const [batchMode, setBatchMode] = useState(false);
-  const [selectedSchedules, setSelectedSchedules] = useState<Set<number>>(
-    new Set()
-  );
-  const [batchGenerating, setBatchGenerating] = useState(false);
-  // 新增批量操作相关函数
-  const handleBatchModeToggle = () => {
-    setBatchMode(!batchMode);
-    setSelectedSchedules(new Set());
-  };
-
-  const handleScheduleSelect = (scheduleId: number) => {
-    const newSelected = new Set(selectedSchedules);
-    if (newSelected.has(scheduleId)) {
-      newSelected.delete(scheduleId);
-    } else {
-      newSelected.add(scheduleId);
-    }
-    setSelectedSchedules(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedSchedules.size === schedules.length) {
-      setSelectedSchedules(new Set());
-    } else {
-      setSelectedSchedules(new Set(schedules.map((s: any) => s.schedule_id)));
-    }
-  };
-
-  const handleBatchGenerate = async () => {
-    if (selectedSchedules.size === 0) {
-      alert("请选择要生成链接的还款计划");
-      return;
-    }
-
-    setBatchGenerating(true);
-
-    try {
-      const ids = Array.from(selectedSchedules);
-      const share_res = await post(`/api/collector/schedules/share`, { ids });
-
-      if (share_res.data.shareUrl) {
-        try {
-          await navigator.clipboard.writeText(share_res.data.shareUrl);
-          alert(`已生成 个分享链接并复制到剪贴板`);
-        } catch (error) {
-          // 降级方案
-          const textArea = document.createElement("textarea");
-          textArea.value = share_res.data.shareUrl;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textArea);
-          alert(`已生成 个分享链接并复制到剪贴板`);
-        }
-      }
-      // 重置选择状态
-      setSelectedSchedules(new Set());
-      setBatchMode(false);
-    } finally {
-      setBatchGenerating(false);
-    }
-  };
-
-  const handleBatchCancel = () => {
-    setSelectedSchedules(new Set());
-    setBatchMode(false);
-  };
-  // 添加处理函数
-  const handleEditSchedule = (record: any) => {
-    setEditingSchedule(record);
-    setEditScheduleForm({
-      due_amount: record.due_amount,
-      paid_amount: record.paid_amount,
-      due_end_date: record.due_end_date,
-      status: record.status,
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingSchedule) return;
-
-    try {
-      await post(
-        `/api/collector/schedules/${editingSchedule.schedule_id}`,
-        editScheduleForm
-      );
-      // 刷新数据
-      const res = await get(
-        `/api/collector/schedules?loan_id=${editingSchedule.loan_id}`
-      );
-      setSchedules(res.data || []);
-      setEditingSchedule(null);
-      alert("更新成功");
-    } catch (error: any) {
-      alert(error.message || "更新失败");
-    }
-  };
-
-  const handleGenerateLink = async (record: any) => {
-    // 生成分享链接
-    const share_res = await put(
-      `/api/collector/schedules/${record.schedule_id}`
-    );
-    alert(share_res.message);
-    // try {
-    //   // 复制到剪贴板
-    //   await navigator.clipboard.writeText(shareUrl);
-    //   alert("链接已复制到剪贴板");
-    // } catch (error) {
-    //   // 降级方案
-    //   const textArea = document.createElement("textarea");
-    //   textArea.value = shareUrl;
-    //   document.body.appendChild(textArea);
-    //   textArea.select();
-    //   document.execCommand("copy");
-    //   document.body.removeChild(textArea);
-    //   alert("链接已复制到剪贴板");
-    // }
-  };
-
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((p) => ({ ...p, [name]: value }));
@@ -205,16 +82,16 @@ export default function FrontUsersPage() {
       return;
     setSubmitting(true);
     try {
-      await post("/api/user", form); // 按你的实际接口地址/入参调整
+      await post("/api/user", form);
       setOpen(false);
       setForm({ username: "", phone: "", password: "", address: "" });
-      // TODO: 刷新列表（如有数据源，可在此触发刷新）
     } catch (e: any) {
       alert(e?.message || "添加失败");
     } finally {
       setSubmitting(false);
     }
   }
+
   const createTab = async (type: TabType) => {
     const tabNames = {
       record: "记录",
@@ -244,7 +121,6 @@ export default function FrontUsersPage() {
 
     // 模拟数据加载
     try {
-      // 这里调用对应的API
       let result = [] as any;
       if (type == "all") {
         const res = await get(`/api/collector/customers`);
@@ -278,21 +154,17 @@ export default function FrontUsersPage() {
       return newTabs;
     });
   };
+
   const filtered = useMemo(() => {
     if (!activeTab) return [];
     return activeTab.data;
   }, [activeTab]);
 
-  async function openSchedulesByLoan(loan: any) {
-    setScheduleOpen(true);
-    setScheduleLoading(true);
-    try {
-      const res = await get(`/api/collector/schedules?loan_id=${loan.loan_id}`);
-      setSchedules(res.data || []);
-    } finally {
-      setScheduleLoading(false);
-    }
-  }
+  // 处理跳转到贷款方案详情页面
+  const handleViewLoanDetails = (loanId: number) => {
+    router.push(`/admin/dashboard/loan/${loanId}`);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-gray-900">前台用户管理</h2>
@@ -329,12 +201,13 @@ export default function FrontUsersPage() {
           添加用户
         </button>
         <Link
-          href="/admin/dashboard/loan"
+          href="/admin/dashboard/loan/add"
           className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           添加方案
         </Link>
       </div>
+
       {/* 标签页 */}
       {tabs.length > 0 && (
         <div className="bg-white rounded-lg ">
@@ -364,6 +237,7 @@ export default function FrontUsersPage() {
           </div>
         </div>
       )}
+
       {activeTab && (
         <div className="bg-white border-gray-200 rounded-lg overflow-hidden">
           {activeTab.loading ? (
@@ -400,51 +274,147 @@ export default function FrontUsersPage() {
                   </div>
                 </div>
               </div>
+
+              {/* 所有客户表格 - 显示贷款方案 */}
               {activeTab.type == "all" && (
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left px-4 py-2 font-medium text-gray-600">
-                        姓名
-                      </th>
-                      <th className="text-left px-4 py-2 font-medium text-gray-600">
-                        手机号
-                      </th>
-                      <th className="text-left px-4 py-2 font-medium text-gray-600">
-                        笔数
-                      </th>
-                      <th className="text-right px-4 py-2 font-medium text-gray-600">
-                        操作
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((user: any) => (
-                      <tr
-                        key={user.username + Date.now()}
-                        className="border-t border-gray-200 text-gray-600"
-                      >
-                        <td className="px-4 py-2">{user.username}</td>
-                        <td className="px-4 py-2">{user.phone}</td>
-                        <td className="px-4 py-2">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                            {user.loanAccount?.length || 0} 笔
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <button
-                            onClick={() => setActiveCustomer(user)}
-                            className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
-                          >
-                            详情
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-4 py-2 font-medium text-gray-600">
+                          客户信息
+                        </th>
+                        <th className="text-left px-4 py-2 font-medium text-gray-600">
+                          贷款方案
+                        </th>
+                        <th className="text-left px-4 py-2 font-medium text-gray-600">
+                          状态
+                        </th>
+                        <th className="text-right px-4 py-2 font-medium text-gray-600">
+                          操作
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filtered.map((customer: Customer) => (
+                        <tr
+                          key={customer.id}
+                          className="border-t border-gray-200 text-gray-600"
+                        >
+                          <td className="px-4 py-2">
+                            <div className="space-y-1">
+                              <div className="font-medium">
+                                {customer.username}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {customer.phone}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {customer.address}
+                              </div>
+                              <div className="text-xs">
+                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
+                                  {customer.lv}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="space-y-2">
+                              {customer.loanAccount?.map((loan) => (
+                                <div
+                                  key={loan.id}
+                                  className="border border-gray-200 rounded p-2 bg-gray-50"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <div>
+                                      <div className="font-medium">
+                                        ¥{loan.loan_amount}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {loan.total_periods}期 | 已还
+                                        {loan.repaid_periods}期
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(
+                                          loan.due_start_date
+                                        ).toLocaleDateString()}{" "}
+                                        -
+                                        {new Date(
+                                          loan.due_end_date
+                                        ).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              {(!customer.loanAccount ||
+                                customer.loanAccount.length === 0) && (
+                                <div className="text-gray-400 text-sm">
+                                  暂无贷款方案
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="space-y-1">
+                              {customer.loanAccount?.map((loan) => (
+                                <div key={loan.id}>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs ${
+                                      loan.status === "pending"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : loan.status === "paid"
+                                        ? "bg-green-100 text-green-800"
+                                        : loan.status === "overdue"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {loan.status === "pending"
+                                      ? "待还款"
+                                      : loan.status === "paid"
+                                      ? "已结清"
+                                      : loan.status === "overdue"
+                                      ? "逾期"
+                                      : loan.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <div className="space-y-1">
+                              <button
+                                onClick={() => setActiveCustomer(customer)}
+                                className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                              >
+                                详情
+                              </button>
+                              {customer.loanAccount?.map((loan) => (
+                                <div key={loan.id}>
+                                  <button
+                                    onClick={() =>
+                                      handleViewLoanDetails(loan.id)
+                                    }
+                                    className="px-2 py-1 text-green-600 hover:bg-green-50 rounded text-xs"
+                                  >
+                                    方案{loan.id}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
 
+              {/* 其他类型的表格保持不变 */}
               {["overdue", "overtime", "paid"].includes(activeTab.type) && (
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
@@ -531,6 +501,7 @@ export default function FrontUsersPage() {
         </div>
       )}
 
+      {/* 客户详情模态框 */}
       {activeCustomer && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl w-full max-w-4xl p-6 space-y-4">
@@ -564,44 +535,55 @@ export default function FrontUsersPage() {
                 {activeCustomer.loanAccount?.length || 0}
               </div>
             </div>
+
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="text-center px-4 py-2 font-medium ">姓名</th>
-                  <th className="text-center px-4 py-2 font-medium ">金额</th>
+                  <th className="text-center px-4 py-2 font-medium">方案ID</th>
+                  <th className="text-center px-4 py-2 font-medium">
+                    贷款金额
+                  </th>
+                  <th className="text-center px-4 py-2 font-medium">期数</th>
                   <th className="text-center px-4 py-2 font-medium">状态</th>
-                  <th className="text-center px-4 py-2 font-medium">详情</th>
+                  <th className="text-center px-4 py-2 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {activeCustomer.loanAccount.map((loan: any) => (
+                {activeCustomer.loanAccount?.map((loan) => (
                   <tr
-                    key={loan.loan_id}
+                    key={loan.id}
                     className="border-t border-gray-200 text-center"
                   >
-                    <td className="px-4 py-2 text-center">{loan.username}</td>
-                    <td className="px-4 py-2 text-center">
-                      {loan.loan_amount}
+                    <td className="px-4 py-2">{loan.id}</td>
+                    <td className="px-4 py-2">¥{loan.loan_amount}</td>
+                    <td className="px-4 py-2">
+                      {loan.repaid_periods}/{loan.total_periods}
                     </td>
                     <td
-                      className={` px-1 py-2 rounded-lg  text-xs ${
+                      className={`px-1 py-2 rounded-lg text-xs ${
                         loan.status === "overdue"
-                          ? " text-red-800"
+                          ? "bg-red-100 text-red-800"
                           : loan.status === "paid"
                           ? "bg-green-100 text-green-800"
                           : loan.status === "pending"
-                          ? " text-yellow-800"
+                          ? "bg-yellow-100 text-yellow-800"
                           : "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {loan.status}
+                      {loan.status === "pending"
+                        ? "待还款"
+                        : loan.status === "paid"
+                        ? "已结清"
+                        : loan.status === "overdue"
+                        ? "逾期"
+                        : loan.status}
                     </td>
-                    <td className="px-4 py-2 text-blue-600">
+                    <td className="px-4 py-2">
                       <button
-                        onClick={() => openSchedulesByLoan(loan)}
+                        onClick={() => handleViewLoanDetails(loan.id)}
                         className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
                       >
-                        方案
+                        查看方案
                       </button>
                     </td>
                   </tr>
@@ -620,6 +602,8 @@ export default function FrontUsersPage() {
           </div>
         </div>
       )}
+
+      {/* 添加用户模态框 */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
@@ -695,231 +679,6 @@ export default function FrontUsersPage() {
                 disabled={submitting}
               >
                 {submitting ? "提交中..." : "确定"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {scheduleOpen && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-4xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">还款计划</h3>
-              <button
-                onClick={() => setScheduleOpen(false)}
-                className="text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
-            </div>
-            {scheduleLoading ? (
-              <div className="p-8 text-center text-gray-500">加载中...</div>
-            ) : schedules.length === 0 ? (
-              <p className="text-gray-600 text-sm">暂无还款计划</p>
-            ) : (
-              <div className="space-y-4">
-                {/* 批量操作控制栏 */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    {!batchMode ? (
-                      <button
-                        onClick={handleBatchModeToggle}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                      >
-                        生成链接
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleSelectAll}
-                          className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
-                        >
-                          {selectedSchedules.size === schedules.length
-                            ? "取消全选"
-                            : "全选"}
-                        </button>
-                        <span className="text-sm text-gray-600">
-                          已选择 {selectedSchedules.size} 项
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {batchMode && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleBatchCancel}
-                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
-                        disabled={batchGenerating}
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={handleBatchGenerate}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
-                        disabled={
-                          batchGenerating || selectedSchedules.size === 0
-                        }
-                      >
-                        {batchGenerating ? "生成中..." : "确定生成"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-                {/* 表格 */}
-                <div className="overflow-x-auto">
-                  <table className="min-w-max text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-center">期数</th>
-                        <th className="px-4 py-2 text-center">应还金额</th>
-                        <th className="px-4 py-2 text-center">截止日期</th>
-                        <th className="px-4 py-2 text-center">状态</th>
-                        <th className="px-4 py-2 text-center">操作</th>
-                        {batchMode && (
-                          <th className="px-4 py-2 text-center">生成链接</th>
-                        )}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {schedules.map((s: any) => (
-                        <tr key={s.schedule_id} className="border-t">
-                          <td className="px-4 py-2">{s.period}</td>
-                          <td className="px-4 py-2">{s.due_amount}</td>
-                          <td className="px-4 py-2">
-                            {String(s.due_end_date).slice(0, 10)}
-                          </td>
-                          <td className="px-4 py-2">{s.status}</td>
-                          <td className="px-4 py-2 text-right">
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={() => handleEditSchedule(s)}
-                                className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
-                              >
-                                编辑
-                              </button>
-                            </div>
-                          </td>
-                          {batchMode && (
-                            <td className="px-4 py-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedSchedules.has(s.schedule_id)}
-                                onChange={() =>
-                                  handleScheduleSelect(s.schedule_id)
-                                }
-                                className="rounded"
-                              />
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-      {/* 编辑模态框 */}
-      {editingSchedule && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-md p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
-                编辑还款信息
-              </h3>
-              <button
-                onClick={() => setEditingSchedule(null)}
-                className="text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  应还金额
-                </label>
-                <input
-                  type="number"
-                  value={editScheduleForm.due_amount || ""}
-                  onChange={(e) =>
-                    setEditScheduleForm((prev) => ({
-                      ...prev,
-                      due_amount: Number(e.target.value) || 0,
-                    }))
-                  }
-                  className="input-base-w"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  实还金额
-                </label>
-                <input
-                  type="number"
-                  value={editScheduleForm.paid_amount || ""}
-                  onChange={(e) =>
-                    setEditScheduleForm((prev) => ({
-                      ...prev,
-                      paid_amount: Number(e.target.value) || 0,
-                    }))
-                  }
-                  className="input-base-w"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">
-                  截至日期
-                </label>
-                <input
-                  type="date"
-                  value={editScheduleForm.due_end_date}
-                  onChange={(e) =>
-                    setEditScheduleForm((prev) => ({
-                      ...prev,
-                      due_end_date: e.target.value,
-                    }))
-                  }
-                  className="input-base-w"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm text-gray-700 mb-1">状态</label>
-                <select
-                  value={editScheduleForm.status}
-                  onChange={(e) =>
-                    setEditScheduleForm((prev) => ({
-                      ...prev,
-                      status: e.target.value,
-                    }))
-                  }
-                  className="input-base-w"
-                >
-                  <option value="pending">待还款</option>
-                  <option value="paid">已还款</option>
-                  <option value="overtime">超期</option>
-                  <option value="overdue">逾期</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setEditingSchedule(null)}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 bg-white hover:bg-gray-50"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-              >
-                保存
               </button>
             </div>
           </div>

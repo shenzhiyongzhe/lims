@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     where: { loan_id: loanId },
     orderBy: [{ period: "asc" }],
     select: {
-      schedule_id: true,
+      id: true,
       loan_id: true,
       period: true,
       due_start_date: true,
@@ -55,14 +55,14 @@ export async function POST(req: NextRequest) {
       // 查询所有指定的还款计划
       const schedules = await prisma.repaymentSchedule.findMany({
         where: {
-          schedule_id: {
+          id: {
             in: ids,
           },
           status: { in: ["pending", "active", "overtime", "overdue"] },
         },
         orderBy: [{ period: "asc" }],
         select: {
-          schedule_id: true,
+          id: true,
           loan_id: true,
           period: true,
           due_amount: true,
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         );
       }
       const loan_account = await prisma.loanAccount.findUnique({
-        where: { loan_id: schedules[0].loan_id },
+        where: { id: schedules[0].loan_id },
         include: {
           user: true,
         },
@@ -116,21 +116,11 @@ export async function POST(req: NextRequest) {
 
       const expiresAt = new Date(Date.now() + 3 * 60 * 60 * 1000); // 3小时后过期
       const shareId = generateShortId();
-      const payee = await prisma.payee.findFirst({
-        where: {
-          username: loan_account.payee,
-        },
-      });
-      if (!payee) {
-        return NextResponse.json(
-          { message: "未找到指定的收款人" },
-          { status: 404 }
-        );
-      }
+
       // 准备存储的数据
       const summary = {
         user: loan_account.user,
-        loan_id: loan_account.loan_id,
+        loan_id: loan_account.id,
         total_periods: loan_account.total_periods,
         repaid_periods: loan_account.repaid_periods,
         total_due_amount: totalDueAmount.toFixed(2),
@@ -140,8 +130,6 @@ export async function POST(req: NextRequest) {
         count: schedules.length,
         today: today.toISOString().split("T")[0],
         due_end_date: schedules[0].due_end_date,
-        payee: payee.username,
-        payee_id: payee.payee_id,
       };
 
       // 存储到数据库

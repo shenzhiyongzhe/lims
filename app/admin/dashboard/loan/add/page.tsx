@@ -6,10 +6,10 @@ import SearchableSelect, {
   SelectOption,
 } from "@/app/_components/SearchableSelect";
 import { useSearchableSelect } from "@/app/_hooks/useSearchableSelect";
+import { useRouter } from "next/navigation";
 
 type LoanPlanForm = {
   user_id: number;
-  username: string;
   loan_amount: number;
   capital: number;
   interest: number;
@@ -17,18 +17,17 @@ type LoanPlanForm = {
   due_end_date: string; // 日期
   handling_fee: number; // 金额
   total_periods: number; // 期数
-  monthly_repayment: number;
+  daily_repayment: number;
   risk_controller: string;
   collector: string;
   payee: string;
+  lender: string;
   company_cost: number;
-  remark: string;
 };
 
 export default function AddLoanPlanPage() {
   const [form, setForm] = useState<LoanPlanForm>({
     user_id: 0,
-    username: "",
     loan_amount: 0,
     capital: 0,
     interest: 0,
@@ -36,24 +35,32 @@ export default function AddLoanPlanPage() {
     due_end_date: "",
     handling_fee: 0, // 金额
     total_periods: 0, // 期数
-    monthly_repayment: 0,
+    daily_repayment: 0,
     risk_controller: "",
     collector: "",
     payee: "",
+    lender: "",
     company_cost: 0,
-    remark: "",
   });
 
   const [users, setUsers] = useState<SelectOption[]>([]);
   const [collectorOptions, setCollectorOptions] = useState<SelectOption[]>([]);
+  const [riskControllerOptions, setRiskControllerOptions] = useState<
+    SelectOption[]
+  >([]);
+  const [lenderOptions, setLenderOptions] = useState<SelectOption[]>([]);
   const [payeeOptions, setPayeeOptions] = useState<SelectOption[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [collectorLoading, setCollectorLoading] = useState(false);
+  const [riskControllerLoading, setRiskControllerLoading] = useState(false);
+  const [lenderLoading, setLenderLoading] = useState(false);
   const [payeeLoading, setPayeeLoading] = useState(false);
-
+  const router = useRouter();
   // 使用自定义Hook管理下拉选择状态
   const userSelect = useSearchableSelect();
   const collectorSelect = useSearchableSelect();
+  const riskControllerSelect = useSearchableSelect();
+  const lenderSelect = useSearchableSelect();
   const payeeSelect = useSearchableSelect();
 
   const fetchUsers = async (query: string) => {
@@ -93,40 +100,51 @@ export default function AddLoanPlanPage() {
       setPayeeLoading(false);
     }
   };
+  const fetchRiskController = async (query: string) => {
+    setRiskControllerLoading(true);
+    try {
+      if (riskControllerOptions.length) return;
+      const res = await get(`/api/admin?role=风控人`);
+      setRiskControllerOptions(res.data || []);
+    } catch (error) {
+      console.error("获取风控人列表失败:", error);
+    } finally {
+      setRiskControllerLoading(false);
+    }
+  };
+  const fetchLender = async (query: string) => {
+    setLenderLoading(true);
+    try {
+      if (lenderOptions.length) return;
+      const res = await get(`/api/admin?role=打款人`);
+      setLenderOptions(res.data || []);
+    } catch (error) {
+      console.error("获取打款人列表失败:", error);
+    } finally {
+      setLenderLoading(false);
+    }
+  };
+  const handleRiskControllerSelect = (user: SelectOption) => {
+    const selectedUser = riskControllerSelect.handleSelect(user);
+    setForm((prev) => ({
+      ...prev,
+      risk_controller: selectedUser.username || "",
+    }));
+  };
+  const handleLenderSelect = (user: SelectOption) => {
+    const selectedUser = lenderSelect.handleSelect(user);
+    setForm((prev) => ({
+      ...prev,
+      lender: selectedUser.username || "",
+    }));
+  };
 
-  // async function loadAdminsOnce(type: keyof typeof rolesMap) {
-  //   if (type === "collector") {
-  //     if (collectorOptions.length) return;
-  //   } else if (type === "payee") {
-  //     if (payeeOptions.length) return;
-  //   }
-  //   setDropdowns((prev) => ({
-  //     ...prev,
-  //     [type]: { ...prev[type], loading: true },
-  //   }));
-  //   try {
-  //     const res = await get<{ data: UserItem[] }>(
-  //       `/api/admin?role=${rolesMap[type]}`
-  //     );
-  //     if (type === "collector") {
-  //       setCollectorOptions(res.data || []);
-  //     } else if (type === "payee") {
-  //       setPayeeOptions(res.data || []);
-  //     }
-  //   } finally {
-  //     setDropdowns((prev) => ({
-  //       ...prev,
-  //       [type]: { ...prev[type], loading: false },
-  //     }));
-  //   }
-  // }
   // 处理用户选择
   const handleUserSelect = (user: SelectOption) => {
     const selectedUser = userSelect.handleSelect(user);
     setForm((prev) => ({
       ...prev,
       user_id: selectedUser.id as number,
-      username: selectedUser.username || "",
     }));
   };
 
@@ -151,7 +169,10 @@ export default function AddLoanPlanPage() {
     fetchUsers("");
     fetchCollector("");
     fetchPayee("");
+    fetchRiskController("");
+    fetchLender("");
   }, []);
+
   useEffect(() => {
     if (userSelect.query) {
       fetchUsers(userSelect.query);
@@ -162,7 +183,19 @@ export default function AddLoanPlanPage() {
     if (payeeSelect.query) {
       fetchPayee(payeeSelect.query);
     }
-  }, [userSelect.query, collectorSelect.query, payeeSelect.query]);
+    if (riskControllerSelect.query) {
+      fetchRiskController(riskControllerSelect.query);
+    }
+    if (lenderSelect.query) {
+      fetchLender(lenderSelect.query);
+    }
+  }, [
+    userSelect.query,
+    collectorSelect.query,
+    payeeSelect.query,
+    riskControllerSelect.query,
+    lenderSelect.query,
+  ]);
 
   useEffect(() => {
     if (form.due_start_date && form.total_periods > 0) {
@@ -180,8 +213,12 @@ export default function AddLoanPlanPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await post<{ message: string }>("/api/loan", form);
+      const res = await post<{ message: string; data: { id: number } }>(
+        "/api/loan",
+        form
+      );
       setMessage(res.message);
+      router.push(`/admin/dashboard/loan/${res.data.id}`);
     } catch (error: any) {
       setMessage(error.message);
     }
@@ -303,11 +340,11 @@ export default function AddLoanPlanPage() {
             </label>
             <input
               type="number"
-              value={form.monthly_repayment || ""}
+              value={form.daily_repayment || ""}
               onChange={(e) =>
                 setForm((f) => ({
                   ...f,
-                  monthly_repayment: Number(e.target.value) || 0,
+                  daily_repayment: Number(e.target.value) || 0,
                 }))
               }
               required
@@ -315,6 +352,32 @@ export default function AddLoanPlanPage() {
               placeholder="请输入每期还款金额"
             />
           </div>
+          <SearchableSelect
+            label="风控人"
+            value={riskControllerSelect.selectedValue}
+            placeholder="请选择风控人"
+            options={riskControllerOptions}
+            loading={riskControllerLoading}
+            query={riskControllerSelect.query}
+            onQueryChange={riskControllerSelect.handleQueryChange}
+            onSelect={handleRiskControllerSelect}
+            onToggle={riskControllerSelect.handleToggle}
+            onClose={riskControllerSelect.handleClose}
+            isOpen={riskControllerSelect.isOpen}
+          />
+          <SearchableSelect
+            label="打款人"
+            value={lenderSelect.selectedValue}
+            placeholder="请选择打款人"
+            options={lenderOptions}
+            loading={lenderLoading}
+            query={lenderSelect.query}
+            onQueryChange={lenderSelect.handleQueryChange}
+            onSelect={handleLenderSelect}
+            onToggle={lenderSelect.handleToggle}
+            onClose={lenderSelect.handleClose}
+            isOpen={lenderSelect.isOpen}
+          />
           {/* 负责人选择 */}
           <SearchableSelect
             label="负责人"
@@ -331,9 +394,9 @@ export default function AddLoanPlanPage() {
           />
           {/* 收款人选择 */}
           <SearchableSelect
-            label="收款员"
+            label="收款人"
             value={payeeSelect.selectedValue}
-            placeholder="请选择收款员"
+            placeholder="请选择收款人"
             options={payeeOptions}
             loading={payeeLoading}
             query={payeeSelect.query}
@@ -377,20 +440,7 @@ export default function AddLoanPlanPage() {
             />
           </div>
         </div>
-        <div>
-          <label className="block text-sm text-gray-600 mb-1">备注</label>
-          <input
-            type="text"
-            value={form.remark}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                remark: e.target.value,
-              }))
-            }
-            className="input-base-w"
-          />
-        </div>
+
         <div className="flex gap-3 justify-center">
           <button
             type="submit"

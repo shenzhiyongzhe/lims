@@ -6,6 +6,7 @@ import { type PaymentMethod } from "@/lib/constants";
 export async function GET(req: NextRequest) {
   try {
     const payee_id = req.nextUrl.searchParams.get("payee_id");
+    let payeeId: number;
     if (!payee_id) {
       const auth = requireAuth(req);
 
@@ -17,21 +18,24 @@ export async function GET(req: NextRequest) {
       if (!payee) {
         return NextResponse.json({ message: "收款人不存在" }, { status: 404 });
       }
+      payeeId = payee.id;
+    } else {
+      payeeId = Number(payee_id);
     }
 
     const payment_method = req.nextUrl.searchParams.get("payment_method");
     const active = req.nextUrl.searchParams.get("active");
-    const users = await prisma.qrCode.findMany({
+    const qrcodes = await prisma.qrCode.findMany({
       where: {
-        payee_id: Number(payee_id),
+        payee_id: payeeId,
         ...(payment_method
           ? { qrcode_type: payment_method as PaymentMethod }
           : {}),
         ...(active !== null ? { active: active === "true" } : {}),
       },
-      orderBy: { qrcode_id: "desc" },
+      orderBy: { id: "desc" },
       select: {
-        qrcode_id: true,
+        id: true,
         qrcode_url: true,
         qrcode_type: true,
         active: true,
@@ -41,7 +45,7 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json({
-      data: users,
+      data: qrcodes,
     });
   } catch (e) {
     return NextResponse.json({ message: "服务器错误" }, { status: 500 });
@@ -68,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.qrCode.create({
       data: {
-        payee_id: payee.payee_id,
+        payee_id: payee.id,
         qrcode_type,
         qrcode_url,
         active: true,

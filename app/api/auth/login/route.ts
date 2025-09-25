@@ -32,7 +32,7 @@ export async function POST(req: Request) {
         },
       });
       if (payee) {
-        response.cookies.set("payee_id", JSON.stringify(payee.payee_id), {
+        response.cookies.set("payee_id", JSON.stringify(payee.id), {
           path: "/",
           maxAge: 7 * 24 * 60 * 60, // 7天
           httpOnly: true, // 防止 XSS 攻击

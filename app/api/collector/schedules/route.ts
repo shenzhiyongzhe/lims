@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     where: { loan_id: loanId },
     orderBy: [{ period: "asc" }],
     select: {
-      schedule_id: true,
+      id: true,
       loan_id: true,
       period: true,
       due_start_date: true,
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     const { schedule_id, due_amount, due_end_date, status } = await req.json();
 
     const schedule = await prisma.repaymentSchedule.update({
-      where: { schedule_id },
+      where: { id: schedule_id },
       data: { due_amount, due_end_date, status },
     });
 
