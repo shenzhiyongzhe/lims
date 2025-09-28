@@ -84,7 +84,7 @@ model LoanAccount {
 
   // 关系
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  RepaymentSchedules RepaymentSchedule[]
+  repaymentSchedules RepaymentSchedule[]
 
   @@map("loan_accounts")
 }
@@ -117,10 +117,13 @@ model RepaymentRecord {
   loan_id         Int 
   user_id         Int
   paid_amount     Decimal? @db.Decimal(10, 2)
-  paid_at         String? @db.VarChar(19)
+  paid_at         DateTime @default(now())
   payment_method  PaymentMethod @default(wechat_pay) 
   payee_id        Int
   remark          String? @db.VarChar(255)
+  order_id        String?
+
+  order         Order? @relation(fields: [order_id], references: [id])
 
   @@map("repayment_records")
 }
@@ -154,7 +157,7 @@ model ShareLink {
   // 可选：关联到创建者
   created_by   Int? // 创建者ID（管理员ID）
   admin        Admin? @relation(fields: [created_by], references: [id])
-
+  orders       Order[]
   @@map("share_links")
 }
 model QrCode {
@@ -171,10 +174,12 @@ model QrCode {
 
 // 在现有schema基础上添加订单表
 model Order {
-  order_id        String   @id @default(cuid())
+  id              String   @id 
+  share_id        String
   customer_id     Int
   loan_id         Int
   amount          Decimal  @db.Decimal(10, 2)
+  payment_periods  Int
   payment_method  PaymentMethod
   remark          String?  @db.VarChar(255)
   status          OrderStatus @default(pending)
@@ -185,8 +190,15 @@ model Order {
 
   customer        User     @relation(fields: [customer_id], references: [id])
   payee           Payee?   @relation(fields: [payee_id], references: [id])
+  share_link      ShareLink @relation(fields: [share_id], references: [share_id], onDelete: Cascade, onUpdate: Cascade)
+  repaymentRecords RepaymentRecord[]
+
 
   @@map("orders")
+  @@index([status, created_at])
+  @@index([payee_id, created_at])
+  @@index([customer_id, created_at])
+
 }
 
 enum OrderStatus {

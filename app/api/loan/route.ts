@@ -2,38 +2,24 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/prisma/prisma";
 import { requireAuth } from "@/lib/auth";
 import { formatDateForAPI, getCurrentBeijingDateObject } from "@/lib/tool";
+import { buildLoanWhere } from "@/lib/rbac";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    const authUser = requireAuth(req);
     const { searchParams } = new URL(req.url);
     const collector = searchParams.get("collector")?.trim() || "";
-    const page = Math.max(1, Number(searchParams.get("page") || 1));
-    const pageSize = Math.min(
-      100,
-      Math.max(1, Number(searchParams.get("pageSize") || 20))
-    );
-    const skip = (page - 1) * pageSize;
 
-    const where = collector
-      ? {
-          // 若仅支持精确匹配可用 equals: phone
-          collector: { contains: collector }, // 模糊查询，可能走不到索引
-        }
-      : {};
+    const baseWhere = collector ? { collector } : {};
+    const where = buildLoanWhere(authUser, baseWhere);
 
-    const [total, users] = await Promise.all([
-      prisma.loanAccount.count({ where }),
-      prisma.loanAccount.findMany({
-        where,
-        orderBy: { id: "desc" },
-        skip,
-        take: pageSize,
-      }),
-    ]);
+    const users = await prisma.loanAccount.findMany({
+      where,
+      orderBy: { id: "desc" },
+    });
 
     return NextResponse.json({
       data: users,
-      pagination: { page, pageSize, total },
     });
   } catch (e) {
     return NextResponse.json({ message: "服务器错误" }, { status: 500 });

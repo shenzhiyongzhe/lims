@@ -79,10 +79,46 @@ export async function POST(req: NextRequest) {
 
     if (type === "submit_order") {
       // 将订单添加到待处理列表
-      pendingOrders.set(data.orderId, data);
+      pendingOrders.set(data.id, data);
 
       // 广播订单给收款人
       await broadcastOrder(data);
+
+      // 持久化到数据库（幂等 upsert）
+      const customerId = Number(data.customer_id);
+      const loanId = Number(data.loan_id);
+      const amount = data.amount as any; // Decimal: 传 string/number 均可
+      const payment_periods = Number(data.payment_periods ?? 0);
+      const payment_method = data.payment_method; // "wechat_pay" | "ali_pay"
+      const remark = data.remark ?? null;
+      const expiresAt = new Date(Date.now() + 180 * 1000); // 默认 60s 过期，可按需调整
+
+      await prisma.order.upsert({
+        where: { id: data.id },
+        create: {
+          id: data.id,
+          share_id: data.share_id,
+          customer_id: customerId,
+          loan_id: loanId,
+          amount,
+          payment_periods,
+          payment_method,
+          remark,
+          expires_at: expiresAt,
+        },
+        update: {
+          share_id: data.share_id,
+          customer_id: customerId,
+          loan_id: loanId,
+          amount,
+          payment_periods,
+          payment_method,
+          remark,
+          expires_at: expiresAt,
+          status: "pending",
+          payee_id: null,
+        },
+      });
 
       return new Response(
         JSON.stringify({
@@ -97,7 +133,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "grab_order") {
-      const { orderId } = data;
+      const { id } = data;
       // 从cookie获取payee_id
       const cookies = req.cookies;
       const payeeId = cookies.get("payee_id")?.value;
@@ -115,8 +151,8 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      console.log("grab_order request data:", { payeeId, orderId, data });
-      const result = await handleGrabOrder(Number(payeeId), orderId);
+      console.log("grab_order request data:", { payeeId, id, data });
+      const result = await handleGrabOrder(Number(payeeId), id);
 
       return new Response(JSON.stringify(result), {
         status: 200,
@@ -177,7 +213,7 @@ async function calculatePayeePriority(orderData: any) {
     const historyCount = await prisma.repaymentRecord.count({
       where: {
         payee_id: payee.id,
-        user_id: orderData.customerId,
+        user_id: orderData.customer_id,
       },
     });
 
@@ -245,8 +281,11 @@ async function broadcastOrder(orderData: any) {
           const message = {
             type: "new_order",
             data: {
-              orderId: orderData.orderId,
+              id: orderData.id,
+              loan_id: orderData.loan_id,
+              customer_id: orderData.customer_id,
               customer: orderData.customer,
+              payment_periods: orderData.payment_periods,
               amount: orderData.amount,
               payment_method: orderData.payment_method,
               remark: orderData.remark,
@@ -261,10 +300,10 @@ async function broadcastOrder(orderData: any) {
 }
 
 // 处理抢单请求
-async function handleGrabOrder(payeeId: number, orderId: string) {
-  console.log("handleGrabOrder called with:", { payeeId, orderId });
+async function handleGrabOrder(payeeId: number, id: string) {
+  console.log("handleGrabOrder called with:", { payeeId, id });
 
-  const order = pendingOrders.get(orderId);
+  const order = pendingOrders.get(id);
   if (!order) {
     return { success: false, message: "订单不存在或已过期" };
   }
@@ -304,17 +343,47 @@ async function handleGrabOrder(payeeId: number, orderId: string) {
   }
 
   // 抢单成功，移除待处理订单
-  pendingOrders.delete(orderId);
+  pendingOrders.delete(id);
+
+  // 同步数据库的订单状态（若不存在则创建一条 grabbed 的记录以保证幂等）
+  try {
+    const customerId = Number(order.customer_id);
+    await prisma.order.upsert({
+      where: { id: id },
+      update: {
+        share_id: order.share_id,
+        payee_id: payeeId,
+        status: "grabbed",
+        updated_at: new Date(),
+      },
+      create: {
+        id: id,
+        share_id: order.share_id,
+        customer_id: customerId,
+        loan_id: Number(order.loan_id),
+        amount: order.amount as any,
+        payment_periods: Number(order.payment_periods ?? 0),
+        payment_method: order.payment_method,
+        remark: order.remark ?? null,
+        status: "grabbed",
+        payee_id: payeeId,
+        expires_at: new Date(Date.now() + 60 * 1000),
+      },
+    });
+  } catch (e) {
+    console.error("order upsert on grab failed:", e);
+  }
 
   // 通知客户抢单成功
-  const connectionId = customerConnections.get(order.customerId);
+  const connectionId = customerConnections.get(order.customer_id);
   if (connectionId) {
     const controller = sseConnections.get(connectionId);
     if (controller) {
       const message = {
         type: "order_grabbed",
         data: {
-          orderId,
+          id: id,
+          share_id: order.share_id,
           payeeId,
           payeeName: payee.username,
         },

@@ -27,7 +27,7 @@ export default function ShareRepaymentPage() {
     user_id: 0,
     loan_id: 0,
     payment_method: "wechat_pay",
-    period: 1,
+    payment_periods: 1,
     amount: 0,
     remark: "",
   });
@@ -67,8 +67,9 @@ export default function ShareRepaymentPage() {
 
     // 发送订单到SSE服务
     const orderData = {
-      orderId: `order_${Date.now()}_${form.user_id}`,
-      customerId: form.user_id,
+      id: `${token}`,
+      share_id: token,
+      customer_id: form.user_id,
       customer: {
         username: summary.user.username,
         phone: summary.user.phone,
@@ -78,6 +79,8 @@ export default function ShareRepaymentPage() {
       payment_method: form.payment_method,
       remark: form.remark,
       loan_id: form.loan_id,
+      payment_periods: form.payment_periods,
+      expires_at: summary.expires_at,
     };
 
     try {
@@ -145,6 +148,7 @@ export default function ShareRepaymentPage() {
           ...prev,
           user_id: result.summary.user.id,
           loan_id: result.summary.loan_id,
+          payment_periods: result.summary.count,
         }));
         console.log("result.summary.user.user_id", result.summary.user.id);
       } catch (error: any) {

@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useSSE } from "@/app/_hooks/useSSE";
 
 interface OrderData {
-  orderId: string;
+  id: string;
+  customer_id: number;
   customer: {
     username: string;
     phone: string;
@@ -59,7 +60,7 @@ export default function OrderNotification({
         body: JSON.stringify({
           type: "grab_order",
           data: {
-            orderId: currentOrder.orderId,
+            id: currentOrder.id,
           },
         }),
       });
@@ -69,7 +70,7 @@ export default function OrderNotification({
 
       if (result.success) {
         setCurrentOrder(null);
-        onOrderGrabbed(result.orderId);
+        onOrderGrabbed(result.id);
       }
     } catch (error) {
       setGrabResult({ success: false, message: "抢单失败" });

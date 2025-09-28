@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/prisma/prisma";
 import { requireAuth } from "@/lib/auth";
+import { buildPayeeWhere } from "@/lib/rbac";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req);
+    const where = buildPayeeWhere(auth);
+
     const users = await prisma.payee.findMany({
+      where,
       orderBy: { id: "desc" },
       select: {
         id: true,
@@ -17,9 +22,7 @@ export async function GET(req: Request) {
       },
     });
 
-    return NextResponse.json({
-      data: users,
-    });
+    return NextResponse.json({ data: users });
   } catch (e) {
     return NextResponse.json({ message: "服务器错误" }, { status: 500 });
   }

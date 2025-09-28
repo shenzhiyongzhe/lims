@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 const navItems = [
   { href: "/admin/dashboard/users", label: "后台用户管理", icon: "🏠" },
@@ -18,6 +18,16 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function handleLogout(e: React.MouseEvent) {
+    e.preventDefault();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.replace("/admin/login");
+    }
+  }
 
   return (
     <aside className="w-64 bg-white border-r border-gray-200 hidden md:flex md:flex-col">
@@ -45,6 +55,15 @@ export default function Sidebar() {
           );
         })}
       </nav>
+      <div className="p-4 border-t border-gray-200">
+        <button
+          onClick={handleLogout}
+          className="flex items-center px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md w-full text-left"
+        >
+          <span className="mr-3">🚪</span>
+          退出登录
+        </button>
+      </div>
     </aside>
   );
 }
