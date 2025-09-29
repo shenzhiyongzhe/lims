@@ -30,6 +30,7 @@ export default function AdminLogin() {
     try {
       const res = await post("/api/auth/login", formData);
       if (res.message === "登录成功") {
+        localStorage.setItem("admin", JSON.stringify(res.data));
         router.push("/admin/dashboard");
       } else {
         setError(res.message || "登录失败");

@@ -1,7 +1,11 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/prisma/prisma";
 import { requireAuth } from "@/lib/auth";
-import { formatDateForAPI, getCurrentBeijingDateObject } from "@/lib/tool";
+import {
+  formatDateForAPI,
+  getCurrentBeijingDateObject,
+  toBeijingDateTime,
+} from "@/lib/tool";
 import { buildLoanWhere } from "@/lib/rbac";
 
 export async function GET(req: NextRequest) {
@@ -45,13 +49,12 @@ export async function POST(req: NextRequest) {
     const authUser = requireAuth(req);
     body.created_by = authUser.id;
 
-    const startDateStr = body.due_start_date;
-    const startDate = new Date(startDateStr + "T06:00:00+08:00");
-    const endDate = new Date(startDateStr + "T06:00:00+08:00");
-    endDate.setDate(endDate.getDate() + total_periods);
+    const startDate = new Date(body.due_start_date);
+    const endDate = new Date(body.due_end_date);
+    startDate.setHours(14, 0, 0, 0);
+    endDate.setHours(14, 0, 0, 0);
     body.due_start_date = startDate;
     body.due_end_date = endDate;
-    console.log(`startDate: ${startDate}, endDate: ${endDate}`);
     // 使用事务：创建贷款记录并批量创建还款计划
     const loan = await prisma.$transaction(async (tx) => {
       const created = await tx.loanAccount.create({
@@ -64,10 +67,10 @@ export async function POST(req: NextRequest) {
       const rows = Array.from({ length: periods }).map((_, idx) => {
         const d = new Date(created.due_start_date);
         d.setDate(d.getDate() + idx);
-        d.setHours(6, 0, 0, 0);
+        d.setHours(14, 0, 0, 0);
         const end = new Date(d);
         end.setDate(end.getDate() + 1);
-        end.setHours(6, 0, 0, 0);
+        end.setHours(14, 0, 0, 0);
         return {
           loan_id: created.id,
           period: idx + 1,

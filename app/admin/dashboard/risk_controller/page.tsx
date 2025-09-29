@@ -3,31 +3,41 @@
 import { useMemo, useState } from "react";
 import { get, post } from "@/lib/http";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type TabType = "all" | "overdue" | "paid" | "overtime" | "record";
 
 type Customer = {
-  id: string;
+  id: number;
   username: string;
   phone: string;
   address: string;
   lv: string;
   loanAccount: {
-    id: string;
-    total: number;
-    startDate: string;
-    endDate: string;
-
-    installments: {
-      period: number;
-      amount: number;
-      status: "已还" | "未还" | "逾期" | "未开始";
-      repayStartTime: string; // HH:mm
-      repayEndTime: string; // HH:mm
-      repayTime?: string; // YYYY-MM-DD HH:mm
-    }[];
+    id: number;
+    user_id: number;
+    loan_amount: string;
+    receiving_amount: string | null;
+    capital: string;
+    interest: string;
+    due_start_date: string;
+    due_end_date: string;
+    status: string;
+    handling_fee: string;
+    total_periods: number;
+    repaid_periods: number;
+    daily_repayment: string;
+    risk_controller: string;
+    collector: string;
+    payee: string;
+    lender: string;
+    company_cost: number;
+    created_at: string;
+    created_by: number;
+    updated_at: string | null;
   }[];
 };
+
 type Tab = {
   id: string;
   type: TabType;
@@ -36,8 +46,8 @@ type Tab = {
   loading: boolean;
 };
 
-const initialCustomers: Customer[] = [];
 export default function FrontUsersPage() {
+  const router = useRouter();
   const [tabs, setTabs] = useState<Tab[]>([
     {
       id: "record-default",
@@ -62,10 +72,6 @@ export default function FrontUsersPage() {
     address: "",
   });
 
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [schedules, setSchedules] = useState<any[]>([]);
-
   const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setForm((p) => ({ ...p, [name]: value }));
@@ -76,16 +82,16 @@ export default function FrontUsersPage() {
       return;
     setSubmitting(true);
     try {
-      await post("/api/user", form); // 按你的实际接口地址/入参调整
+      await post("/api/user", form);
       setOpen(false);
       setForm({ username: "", phone: "", password: "", address: "" });
-      // TODO: 刷新列表（如有数据源，可在此触发刷新）
     } catch (e: any) {
       alert(e?.message || "添加失败");
     } finally {
       setSubmitting(false);
     }
   }
+
   const createTab = async (type: TabType) => {
     const tabNames = {
       record: "记录",
@@ -115,16 +121,12 @@ export default function FrontUsersPage() {
 
     // 模拟数据加载
     try {
-      // 这里调用对应的API
       let result = [] as any;
       if (type == "all") {
-        const res = await get(`/api/collector/customers?collector=${"张三"}`);
+        const res = await get(`/api/collector/customers`);
         result = res.data;
       } else if (type == "paid" || type == "overdue" || type == "overtime") {
-        const res = await get(
-          `/api/collector/customers?collector=${"张三"}&status=${type}`
-        );
-        console.log("type res:" + JSON.stringify(res));
+        const res = await get(`/api/collector/customers?&status=${type}`);
         result = res.data;
       }
       setTabs((prev) =>
@@ -152,21 +154,17 @@ export default function FrontUsersPage() {
       return newTabs;
     });
   };
+
   const filtered = useMemo(() => {
     if (!activeTab) return [];
     return activeTab.data;
   }, [activeTab]);
 
-  async function openSchedulesByLoan(loan: any) {
-    setScheduleOpen(true);
-    setScheduleLoading(true);
-    try {
-      const res = await get(`/api/collector/schedules?loan_id=${loan.loan_id}`);
-      setSchedules(res.data || []);
-    } finally {
-      setScheduleLoading(false);
-    }
-  }
+  // 处理跳转到贷款方案详情页面
+  const handleViewLoanDetails = (loanId: number) => {
+    router.push(`/admin/dashboard/loan/${loanId}`);
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold text-gray-900">前台用户管理</h2>
@@ -203,12 +201,13 @@ export default function FrontUsersPage() {
           添加用户
         </button>
         <Link
-          href="/admin/dashboard/loan"
+          href="/admin/dashboard/loan/add"
           className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           添加方案
         </Link>
       </div>
+
       {/* 标签页 */}
       {tabs.length > 0 && (
         <div className="bg-white rounded-lg ">
@@ -238,6 +237,7 @@ export default function FrontUsersPage() {
           </div>
         </div>
       )}
+
       {activeTab && (
         <div className="bg-white border-gray-200 rounded-lg overflow-hidden">
           {activeTab.loading ? (
@@ -274,51 +274,147 @@ export default function FrontUsersPage() {
                   </div>
                 </div>
               </div>
+
+              {/* 所有客户表格 - 显示贷款方案 */}
               {activeTab.type == "all" && (
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="text-left px-4 py-2 font-medium text-gray-600">
-                        姓名
-                      </th>
-                      <th className="text-left px-4 py-2 font-medium text-gray-600">
-                        手机号
-                      </th>
-                      <th className="text-left px-4 py-2 font-medium text-gray-600">
-                        笔数
-                      </th>
-                      <th className="text-right px-4 py-2 font-medium text-gray-600">
-                        操作
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((user: any) => (
-                      <tr
-                        key={user.username + Date.now()}
-                        className="border-t border-gray-200 text-gray-600"
-                      >
-                        <td className="px-4 py-2">{user.username}</td>
-                        <td className="px-4 py-2">{user.phone}</td>
-                        <td className="px-4 py-2">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                            {user.loanAccount?.length || 0} 笔
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <button
-                            onClick={() => setActiveCustomer(user)}
-                            className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
-                          >
-                            详情
-                          </button>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="text-left px-4 py-2 font-medium text-gray-600">
+                          客户信息
+                        </th>
+                        <th className="text-left px-4 py-2 font-medium text-gray-600">
+                          贷款方案
+                        </th>
+                        <th className="text-left px-4 py-2 font-medium text-gray-600">
+                          状态
+                        </th>
+                        <th className="text-right px-4 py-2 font-medium text-gray-600">
+                          操作
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {filtered.map((customer: Customer) => (
+                        <tr
+                          key={customer.id}
+                          className="border-t border-gray-200 text-gray-600"
+                        >
+                          <td className="px-4 py-2">
+                            <div className="space-y-1">
+                              <div className="font-medium">
+                                {customer.username}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {customer.phone}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {customer.address}
+                              </div>
+                              <div className="text-xs">
+                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
+                                  {customer.lv}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="space-y-2">
+                              {customer.loanAccount?.map((loan) => (
+                                <div
+                                  key={loan.id}
+                                  className="border border-gray-200 rounded p-2 bg-gray-50"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <div>
+                                      <div className="font-medium">
+                                        ¥{loan.loan_amount}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {loan.total_periods}期 | 已还
+                                        {loan.repaid_periods}期
+                                      </div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-xs text-gray-500">
+                                        {new Date(
+                                          loan.due_start_date
+                                        ).toLocaleDateString()}{" "}
+                                        -
+                                        {new Date(
+                                          loan.due_end_date
+                                        ).toLocaleDateString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                              {(!customer.loanAccount ||
+                                customer.loanAccount.length === 0) && (
+                                <div className="text-gray-400 text-sm">
+                                  暂无贷款方案
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="space-y-1">
+                              {customer.loanAccount?.map((loan) => (
+                                <div key={loan.id}>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs ${
+                                      loan.status === "pending"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : loan.status === "paid"
+                                        ? "bg-green-100 text-green-800"
+                                        : loan.status === "overdue"
+                                        ? "bg-red-100 text-red-800"
+                                        : "bg-gray-100 text-gray-800"
+                                    }`}
+                                  >
+                                    {loan.status === "pending"
+                                      ? "待还款"
+                                      : loan.status === "paid"
+                                      ? "已结清"
+                                      : loan.status === "overdue"
+                                      ? "逾期"
+                                      : loan.status}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right">
+                            <div className="space-y-1">
+                              <button
+                                onClick={() => setActiveCustomer(customer)}
+                                className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                              >
+                                详情
+                              </button>
+                              {customer.loanAccount?.map((loan) => (
+                                <div key={loan.id}>
+                                  <button
+                                    onClick={() =>
+                                      handleViewLoanDetails(loan.id)
+                                    }
+                                    className="px-2 py-1 text-green-600 hover:bg-green-50 rounded text-xs"
+                                  >
+                                    方案{loan.id}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
 
+              {/* 其他类型的表格保持不变 */}
               {["overdue", "overtime", "paid"].includes(activeTab.type) && (
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50">
@@ -405,6 +501,7 @@ export default function FrontUsersPage() {
         </div>
       )}
 
+      {/* 客户详情模态框 */}
       {activeCustomer && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl w-full max-w-4xl p-6 space-y-4">
@@ -438,44 +535,55 @@ export default function FrontUsersPage() {
                 {activeCustomer.loanAccount?.length || 0}
               </div>
             </div>
+
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="text-center px-4 py-2 font-medium ">姓名</th>
-                  <th className="text-center px-4 py-2 font-medium ">金额</th>
+                  <th className="text-center px-4 py-2 font-medium">方案ID</th>
+                  <th className="text-center px-4 py-2 font-medium">
+                    贷款金额
+                  </th>
+                  <th className="text-center px-4 py-2 font-medium">期数</th>
                   <th className="text-center px-4 py-2 font-medium">状态</th>
-                  <th className="text-center px-4 py-2 font-medium">详情</th>
+                  <th className="text-center px-4 py-2 font-medium">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {activeCustomer.loanAccount.map((loan: any) => (
+                {activeCustomer.loanAccount?.map((loan) => (
                   <tr
-                    key={loan.loan_id}
+                    key={loan.id}
                     className="border-t border-gray-200 text-center"
                   >
-                    <td className="px-4 py-2 text-center">{loan.username}</td>
-                    <td className="px-4 py-2 text-center">
-                      {loan.loan_amount}
+                    <td className="px-4 py-2">{loan.id}</td>
+                    <td className="px-4 py-2">¥{loan.loan_amount}</td>
+                    <td className="px-4 py-2">
+                      {loan.repaid_periods}/{loan.total_periods}
                     </td>
                     <td
-                      className={` px-1 py-2 rounded-lg  text-xs ${
+                      className={`px-1 py-2 rounded-lg text-xs ${
                         loan.status === "overdue"
-                          ? " text-red-800"
+                          ? "bg-red-100 text-red-800"
                           : loan.status === "paid"
                           ? "bg-green-100 text-green-800"
                           : loan.status === "pending"
-                          ? " text-yellow-800"
+                          ? "bg-yellow-100 text-yellow-800"
                           : "bg-gray-100 text-gray-800"
                       }`}
                     >
-                      {loan.status}
+                      {loan.status === "pending"
+                        ? "待还款"
+                        : loan.status === "paid"
+                        ? "已结清"
+                        : loan.status === "overdue"
+                        ? "逾期"
+                        : loan.status}
                     </td>
-                    <td className="px-4 py-2 text-blue-600">
+                    <td className="px-4 py-2">
                       <button
-                        onClick={() => openSchedulesByLoan(loan)}
+                        onClick={() => handleViewLoanDetails(loan.id)}
                         className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded"
                       >
-                        方案
+                        查看方案
                       </button>
                     </td>
                   </tr>
@@ -494,6 +602,8 @@ export default function FrontUsersPage() {
           </div>
         </div>
       )}
+
+      {/* 添加用户模态框 */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
@@ -571,53 +681,6 @@ export default function FrontUsersPage() {
                 {submitting ? "提交中..." : "确定"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      {scheduleOpen && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl w-full max-w-4xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">还款计划</h3>
-              <button
-                onClick={() => setScheduleOpen(false)}
-                className="text-gray-500 hover:text-gray-800"
-              >
-                ✕
-              </button>
-            </div>
-            {scheduleLoading ? (
-              <div className="p-8 text-center text-gray-500">加载中...</div>
-            ) : schedules.length === 0 ? (
-              <p className="text-gray-600 text-sm">暂无还款计划</p>
-            ) : (
-              <table className="min-w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left">期数</th>
-                    <th className="px-4 py-2 text-left">应还金额</th>
-                    <th className="px-4 py-2 text-left">开始日期</th>
-                    <th className="px-4 py-2 text-left">结束日期</th>
-                    <th className="px-4 py-2 text-left">状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {schedules.map((s: any) => (
-                    <tr key={s.schedule_id} className="border-t">
-                      <td className="px-4 py-2">{s.period}</td>
-                      <td className="px-4 py-2">{s.due_amount}</td>
-                      <td className="px-4 py-2">
-                        {String(s.due_start_date).slice(0, 10)}
-                      </td>
-                      <td className="px-4 py-2">
-                        {String(s.due_end_date).slice(0, 10)}
-                      </td>
-                      <td className="px-4 py-2">{s.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
           </div>
         </div>
       )}

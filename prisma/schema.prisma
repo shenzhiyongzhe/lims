@@ -14,6 +14,7 @@ model User {
   phone        String   @db.VarChar(11) @unique
   address      String   @db.VarChar(100)
   lv           String   @default("青铜用户") @db.VarChar(16)
+  overtime     Int      @default(0)
   overdue_time Int      @default(0)
   is_high_risk Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -104,6 +105,7 @@ model RepaymentSchedule {
 
   // 外键关系到 LoanAccount
   loan_account LoanAccount @relation(fields: [loan_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  overdueRecords OverdueRecord[]
 
   @@map("repayment_schedules")
 }
@@ -126,6 +128,24 @@ model RepaymentRecord {
   order         Order? @relation(fields: [order_id], references: [id])
 
   @@map("repayment_records")
+}
+
+// 每日逾期记录表（去重按 schedule_id）
+model OverdueRecord {
+  id           Int      @id @default(autoincrement())
+  user_id      Int
+  loan_id      Int
+  schedule_id  Int      @unique
+  collector    String   @db.VarChar(10)
+  overdue_date DateTime
+  created_at   DateTime @default(now())
+
+  schedule     RepaymentSchedule @relation(fields: [schedule_id], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@map("overdue_records")
+  @@index([collector, overdue_date])
+  @@index([overdue_date])
+  @@index([user_id, overdue_date])
 }
 
 
