@@ -92,69 +92,6 @@ export default function FrontUsersPage() {
     }
   }
 
-  const createTab = async (type: TabType) => {
-    const tabNames = {
-      record: "记录",
-      all: "所有",
-      overtime: "风险",
-      overdue: "逾期",
-      paid: "结清",
-    };
-
-    // 检查是否已存在相同类型的标签页
-    const existingTab = tabs.find((t) => t.type === type);
-    if (existingTab) {
-      setActiveTabId(existingTab.id);
-      return;
-    }
-
-    const newTab: Tab = {
-      id: `${type}-${Date.now()}`,
-      type,
-      name: tabNames[type],
-      data: [],
-      loading: true,
-    };
-
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(newTab.id);
-
-    // 模拟数据加载
-    try {
-      let result = [] as any;
-      if (type == "all") {
-        const res = await get(`/api/collector/customers`);
-        result = res.data;
-      } else if (type == "paid" || type == "overdue" || type == "overtime") {
-        const res = await get(`/api/collector/customers?&status=${type}`);
-        result = res.data;
-      }
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === newTab.id ? { ...t, data: result, loading: false } : t
-        )
-      );
-    } catch (error) {
-      setTabs((prev) =>
-        prev.map((t) =>
-          t.id === newTab.id ? { ...t, data: [], loading: false } : t
-        )
-      );
-    }
-  };
-
-  const closeTab = (tabId: string) => {
-    setTabs((prev) => {
-      const newTabs = prev.filter((t) => t.id !== tabId);
-      if (activeTabId === tabId) {
-        setActiveTabId(
-          newTabs.length > 0 ? newTabs[newTabs.length - 1].id : ""
-        );
-      }
-      return newTabs;
-    });
-  };
-
   const filtered = useMemo(() => {
     if (!activeTab) return [];
     return activeTab.data;
@@ -170,36 +107,36 @@ export default function FrontUsersPage() {
       <h2 className="text-xl font-semibold text-gray-900">前台用户管理</h2>
 
       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button
-          onClick={() => createTab("all")}
+        <Link
+          href="/admin/dashboard/loan/list"
           className="px-3 py-4 bg-[#b2e1e6] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           所有客户
-        </button>
-        <button
-          onClick={() => createTab("overdue")}
+        </Link>
+        <Link
+          href="/admin/dashboard/loan/list?status=overdue"
           className="px-3 py-4 bg-[#B6E5D8] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           逾期客户
-        </button>
-        <button
-          onClick={() => createTab("paid")}
+        </Link>
+        <Link
+          href="/admin/dashboard/loan/list?status=paid"
           className="px-3 py-4 bg-[#FBE5C8] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           结清客户
-        </button>
-        <button
-          onClick={() => createTab("overtime")}
+        </Link>
+        <Link
+          href="/admin/dashboard/loan/list?status=overtime"
           className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           风险客户
-        </button>
-        <button
-          onClick={() => setOpen(true)}
+        </Link>
+        <Link
+          href="/admin/dashboard/user/add"
           className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           添加用户
-        </button>
+        </Link>
         <Link
           href="/admin/dashboard/loan/add"
           className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
@@ -207,36 +144,6 @@ export default function FrontUsersPage() {
           添加方案
         </Link>
       </div>
-
-      {/* 标签页 */}
-      {tabs.length > 0 && (
-        <div className="bg-white rounded-lg ">
-          <div className="flex ">
-            {tabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={`flex items-center px-4 py-2 border-x-red-300   cursor-pointer ${
-                  activeTabId === tab.id
-                    ? "bg-blue-50 text-blue-600 border-b-2 border-blue-600"
-                    : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
-                onClick={() => setActiveTabId(tab.id)}
-              >
-                <span className="mr-2">{tab.name}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                  }}
-                  className="ml-2 text-gray-400  hover:text-gray-600"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {activeTab && (
         <div className="bg-white border-gray-200 rounded-lg overflow-hidden">

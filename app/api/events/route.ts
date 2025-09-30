@@ -238,8 +238,8 @@ async function calculatePayeePriority(orderData: any) {
       where: {
         payee_id: payee.id,
         paid_at: {
-          gte: today.toISOString().slice(0, 19),
-          lt: tomorrow.toISOString().slice(0, 19),
+          gte: today.toISOString(),
+          lt: tomorrow.toISOString(),
         },
       },
       _sum: {
@@ -271,8 +271,9 @@ async function calculatePayeePriority(orderData: any) {
 // 广播订单给收款人
 async function broadcastOrder(orderData: any) {
   const priorities = await calculatePayeePriority(orderData);
-
   for (const { payee, delay } of priorities) {
+    console.log("broadcastOrder payee:", JSON.stringify(payee));
+    console.log("broadcastOrder delay:", delay);
     setTimeout(() => {
       const connectionId = payeeConnections.get(payee.id);
       if (connectionId) {
@@ -318,8 +319,8 @@ async function handleGrabOrder(payeeId: number, id: string) {
     where: {
       payee_id: payeeId,
       paid_at: {
-        gte: today.toISOString().slice(0, 19),
-        lt: tomorrow.toISOString().slice(0, 19),
+        gte: today.toISOString(),
+        lt: tomorrow.toISOString(),
       },
     },
     _sum: {

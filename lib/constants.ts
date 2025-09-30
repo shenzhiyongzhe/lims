@@ -27,6 +27,7 @@ export const ROLES = [
   "收款人",
   "打款人",
 ] as const;
+export type Role = (typeof ROLES)[number];
 
 export const ROLESMAP = {
   admin: "管理员",

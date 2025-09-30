@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { post } from "@/lib/http";
+import { roleZhToEn } from "@/lib/constants";
 
 export default function AdminLogin() {
   const [formData, setFormData] = useState({
@@ -31,7 +32,7 @@ export default function AdminLogin() {
       const res = await post("/api/auth/login", formData);
       if (res.message === "登录成功") {
         localStorage.setItem("admin", JSON.stringify(res.data));
-        router.push("/admin/dashboard");
+        router.push(`/admin/dashboard/${roleZhToEn(res.data.role)}`);
       } else {
         setError(res.message || "登录失败");
       }

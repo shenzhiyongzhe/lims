@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/prisma/prisma";
 
-type Ctx = { params: { id: string } };
+type Ctx = { params: Promise<{ id: string }> };
 
 export async function GET(_req: Request, { params }: Ctx) {
-  const id = Number(params.id);
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   if (!Number.isInteger(id))
     return NextResponse.json({ message: "参数错误" }, { status: 400 });
 
@@ -28,7 +29,8 @@ export async function GET(_req: Request, { params }: Ctx) {
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {
-  const id = Number(params.id);
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   if (!Number.isInteger(id))
     return NextResponse.json({ message: "参数错误" }, { status: 400 });
 
@@ -58,7 +60,8 @@ export async function PATCH(req: Request, { params }: Ctx) {
 }
 
 export async function DELETE(_req: Request, { params }: Ctx) {
-  const id = Number(params.id);
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   if (!Number.isInteger(id))
     return NextResponse.json({ message: "参数错误" }, { status: 400 });
 

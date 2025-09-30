@@ -68,7 +68,7 @@ async function calculatePayeePriority(orderData: any) {
     // 1. 检查历史记录优先级（20秒延迟）
     const historyCount = await prisma.repaymentRecord.count({
       where: {
-        payee_id: payee.payee_id,
+        payee_id: payee.id,
         user_id: user_id,
       },
     });
@@ -92,7 +92,7 @@ async function calculatePayeePriority(orderData: any) {
 
     const todayAmount = await prisma.repaymentRecord.aggregate({
       where: {
-        payee_id: payee.payee_id,
+        payee_id: payee.id,
         paid_at: {
           gte: today.toISOString().slice(0, 19),
           lt: tomorrow.toISOString().slice(0, 19),
@@ -131,7 +131,7 @@ async function broadcastOrder(orderData: any) {
 
   for (const { payee, delay } of priorities) {
     setTimeout(() => {
-      const connection = payeeConnections.get(payee.payee_id);
+      const connection = payeeConnections.get(payee.id);
       if (connection && connection.readyState === 1) {
         connection.send(
           JSON.stringify({
@@ -178,7 +178,7 @@ async function handleGrabOrder(payeeId: number, orderId: string) {
   });
 
   const payee = await prisma.payee.findUnique({
-    where: { payee_id: payeeId },
+    where: { id: payeeId },
   });
 
   if (!payee) {

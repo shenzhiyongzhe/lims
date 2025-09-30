@@ -195,6 +195,22 @@ export async function PUT(req: NextRequest) {
           }
         }
 
+        // 4) 同步 LoanAccount 的 receiving_amount 与 repaid_periods
+        const agg = await tx.repaymentSchedule.aggregate({
+          where: { loan_id: updated.loan_id, status: "paid" as any },
+          _sum: { paid_amount: true },
+          _count: { _all: true },
+        });
+        const totalPaid = Number((agg as any)?._sum?.paid_amount || 0);
+        const countPaid = Number((agg as any)?._count?._all || 0);
+        await tx.loanAccount.update({
+          where: { id: updated.loan_id },
+          data: {
+            receiving_amount: totalPaid as any,
+            repaid_periods: countPaid,
+          },
+        });
+
         return updated;
       });
 

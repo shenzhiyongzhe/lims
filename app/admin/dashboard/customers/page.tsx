@@ -25,6 +25,14 @@ export default function CustomersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState({
+    username: "",
+    phone: "",
+    address: "",
+    lv: "青铜用户",
+  });
+  const [adding, setAdding] = useState(false);
 
   const fetchData = async (p = page, ps = pageSize) => {
     setLoading(true);
@@ -70,8 +78,16 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">客户列表</h2>
-        <div className="text-sm text-gray-600">
-          共 {total} 条 · 第 {page}/{totalPages} 页
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAdd(true)}
+            className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            添加客户
+          </button>
+          <div className="text-sm text-gray-600">
+            共 {total} 条 · 第 {page}/{totalPages} 页
+          </div>
         </div>
       </div>
 
@@ -198,6 +214,119 @@ export default function CustomersPage() {
           </div>
         </div>
       </div>
+
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-[90%] max-w-lg">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div className="font-semibold text-gray-800">添加客户</div>
+              <button
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => setShowAdd(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">姓名</label>
+                <input
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder="请输入姓名"
+                  value={addForm.username}
+                  onChange={(e) =>
+                    setAddForm({ ...addForm, username: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">电话</label>
+                <input
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder="请输入11位手机号"
+                  value={addForm.phone}
+                  onChange={(e) =>
+                    setAddForm({ ...addForm, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">地址</label>
+                <input
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder="请输入地址"
+                  value={addForm.address}
+                  onChange={(e) =>
+                    setAddForm({ ...addForm, address: e.target.value })
+                  }
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">等级</label>
+                <select
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  value={addForm.lv}
+                  onChange={(e) =>
+                    setAddForm({ ...addForm, lv: e.target.value })
+                  }
+                >
+                  {[
+                    "青铜用户",
+                    "白银用户",
+                    "黄金用户",
+                    "铂金用户",
+                    "钻石用户",
+                  ].map((v) => (
+                    <option key={v} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {error && <div className="text-sm text-red-600">{error}</div>}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  className="px-3 py-2 text-sm border rounded"
+                  onClick={() => setShowAdd(false)}
+                >
+                  取消
+                </button>
+                <button
+                  className="px-3 py-2 text-sm bg-blue-600 text-white rounded disabled:opacity-50"
+                  disabled={adding}
+                  onClick={async () => {
+                    setAdding(true);
+                    setError("");
+                    try {
+                      const res = await fetch("/api/users/customers", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(addForm),
+                      });
+                      const json = await res.json();
+                      if (!res.ok) throw new Error(json?.message || "创建失败");
+                      setShowAdd(false);
+                      setAddForm({
+                        username: "",
+                        phone: "",
+                        address: "",
+                        lv: "青铜用户",
+                      });
+                      fetchData(1, pageSize);
+                    } catch (e: any) {
+                      setError(e.message || "创建失败");
+                    } finally {
+                      setAdding(false);
+                    }
+                  }}
+                >
+                  {adding ? "创建中..." : "确定创建"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

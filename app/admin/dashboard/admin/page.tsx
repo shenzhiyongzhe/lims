@@ -25,16 +25,16 @@ export default function DashboardHome() {
           收款用户管理
         </Link>
         <Link
-          href="/admin/dashboard/loan"
+          href="/admin/dashboard/loan/add"
           className="p-4 bg-white rounded-lg border hover:shadow-sm"
         >
           添加贷款方案
         </Link>
         <Link
-          href="/admin/dashboard/stats"
+          href="/admin/dashboard/loan/total"
           className="p-4 bg-white rounded-lg border hover:shadow-sm"
         >
-          统计
+          所有贷款方案
         </Link>
         <Link
           href="/admin/dashboard/overdue"

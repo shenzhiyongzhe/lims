@@ -12,14 +12,14 @@ export async function GET(req: NextRequest) {
   try {
     const authUser = requireAuth(req);
     const { searchParams } = new URL(req.url);
-    const collector = searchParams.get("collector")?.trim() || "";
+    const includeUser = searchParams.get("includeUser") === "1";
 
-    const baseWhere = collector ? { collector } : {};
-    const where = buildLoanWhere(authUser, baseWhere);
+    const where = buildLoanWhere(authUser, {});
 
     const users = await prisma.loanAccount.findMany({
       where,
       orderBy: { id: "desc" },
+      include: includeUser ? { user: true } : undefined,
     });
 
     return NextResponse.json({

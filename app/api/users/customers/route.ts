@@ -17,50 +17,52 @@ export async function GET(req: NextRequest) {
 
   if (!auth) return NextResponse.json({ message: "未登录" }, { status: 403 });
 
-  // 先查到符合条件的贷款，再映射到用户并去重
-  const loans = await prisma.loanAccount.findMany({
-    where: { [roleZhToEn(auth.role)]: auth.username },
-    select: {
-      user_id: true,
-      user: {
-        select: {
-          id: true,
-          username: true,
-          phone: true,
-          address: true,
-          lv: true,
-          is_high_risk: true,
-          overtime: true,
-          overdue_time: true,
-        },
-      },
-    },
-    distinct: ["user_id"],
-    orderBy: { user_id: "desc" },
+  const users = await prisma.user.findMany({
     skip,
     take: pageSize,
   });
 
-  // 统计总去重数
-  const total = await prisma.loanAccount
-    .groupBy({
-      by: ["user_id"],
-      where: { [roleZhToEn(auth.role)]: auth.username },
-      _count: { _all: true },
-    })
-    .then((g) => g.length);
+  const total = await prisma.user.count();
 
   return NextResponse.json({
-    data: loans.map((loan) => ({
-      id: loan.user_id,
-      username: loan.user.username,
-      phone: loan.user.phone,
-      address: loan.user.address,
-      lv: loan.user.lv,
-      is_high_risk: loan.user.is_high_risk,
-      overtime: loan.user.overtime,
-      overdue_time: loan.user.overdue_time,
-    })),
+    data: users,
     pagination: { page, pageSize, total },
   });
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const auth = requireAuth(req);
+    if (!auth) return NextResponse.json({ message: "未登录" }, { status: 403 });
+
+    const body = await req.json();
+    const {
+      username,
+      phone,
+      address,
+      password = "123456",
+      lv = "青铜用户",
+    } = body || {};
+
+    if (!username || !phone || !address) {
+      return NextResponse.json({ message: "缺少必要参数" }, { status: 400 });
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        username,
+        phone,
+        address,
+        password, // 简化：明文；生产应加密
+        lv,
+      } as any,
+    });
+
+    return NextResponse.json({ data: user }, { status: 201 });
+  } catch (e: any) {
+    if (e.code === "P2002") {
+      return NextResponse.json({ message: "手机号已存在" }, { status: 409 });
+    }
+    return NextResponse.json({ message: "服务器错误" }, { status: 500 });
+  }
 }

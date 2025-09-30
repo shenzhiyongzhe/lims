@@ -39,11 +39,11 @@ export function buildLoanWhere(
 
   switch (auth.role as Role) {
     case "收款人":
-      return { ...input, OR: [{ collector: username }, { payee: username }] };
+      return { ...input, OR: [{ payee: username }] };
     case "风控人":
       return { ...input, risk_controller: username };
     case "负责人":
-      return { ...input, lender: username };
+      return { ...input, collector: username };
     case "财务员":
     case "打款人":
       // 视业务而定，如果需要只看自己创建的可以用 created_by

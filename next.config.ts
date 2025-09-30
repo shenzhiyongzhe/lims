@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: "standalone",
   allowedDevOrigins: [
     "192.168.1.*", // 允许整个192.168.1.x网段
     "localhost",

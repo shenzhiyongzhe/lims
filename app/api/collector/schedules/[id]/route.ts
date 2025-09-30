@@ -3,11 +3,11 @@ import { prisma } from "@/prisma/prisma";
 import crypto from "crypto";
 
 type Ctx = {
-  params: Promise<{ schedule_id: string }>;
+  params: Promise<{ id: string }>;
 };
 
 export async function GET(req: Request, { params }: Ctx) {
-  const { schedule_id: scheduleId } = await params; // 添加 await
+  const { id: scheduleId } = await params; // 添加 await
   const schedule_id = Number(scheduleId);
 
   if (!Number.isInteger(schedule_id))
@@ -37,7 +37,7 @@ export async function GET(req: Request, { params }: Ctx) {
 }
 
 export async function POST(req: Request, { params }: Ctx) {
-  const { schedule_id: scheduleId } = await params; // 添加 await
+  const { id: scheduleId } = await params; // 添加 await
   const schedule_id = Number(scheduleId);
 
   if (!Number.isInteger(schedule_id))
@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: Ctx) {
 
 // 新增PUT方法来生成分享链接
 export async function PUT(req: Request, { params }: Ctx) {
-  const { schedule_id: scheduleId } = await params;
+  const { id: scheduleId } = await params;
   const schedule_id = Number(scheduleId);
 
   if (!Number.isInteger(schedule_id))

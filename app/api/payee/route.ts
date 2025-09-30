@@ -5,9 +5,9 @@ import { requireAuth } from "@/lib/auth";
 export async function GET(req: Request) {
   try {
     const users = await prisma.payee.findMany({
-      orderBy: { payee_id: "desc" },
+      orderBy: { id: "desc" },
       select: {
-        payee_id: true,
+        id: true,
         username: true,
         createdAt: true,
       },
@@ -33,12 +33,10 @@ export async function POST(req: NextRequest) {
 
     const user = await prisma.payee.create({
       data: {
-        payee_id: auth.id,
+        admin_id: auth.id,
         username,
-        phone,
-        qrcode_type,
-        qrcode_url,
-      } as any,
+        address: "",
+      },
     });
 
     return NextResponse.json(

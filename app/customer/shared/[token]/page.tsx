@@ -35,6 +35,10 @@ export default function ShareRepaymentPage() {
 
   const [qrcodeLoading, setQrcodeLoading] = useState(false);
   const [qrcode, setQrcode] = useState<any>(null);
+  const [countdown, setCountdown] = useState<{
+    text: string;
+    overtime: boolean;
+  }>({ text: "--", overtime: false });
 
   // SSE连接 - 不自动连接，手动控制
   const { isConnected, connect, disconnect } = useSSE({
@@ -163,6 +167,45 @@ export default function ShareRepaymentPage() {
     }
   }, [token]);
 
+  // 倒计时：根据 summary.due_end_date 与当前时间差显示
+  useEffect(() => {
+    if (!summary?.due_end_date) return;
+    const parseDue = () => {
+      // 兼容字符串日期
+      const due = new Date(summary.due_end_date);
+      return isNaN(due.getTime())
+        ? new Date(`${summary.due_end_date}T00:00:00+08:00`)
+        : due;
+    };
+
+    const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+    const fmt = (ms: number) => {
+      const abs = Math.abs(ms);
+      const totalSec = Math.floor(abs / 1000);
+      const days = Math.floor(totalSec / 86400);
+      const hours = Math.floor((totalSec % 86400) / 3600);
+      const mins = Math.floor((totalSec % 3600) / 60);
+      const secs = totalSec % 60;
+      const dh = days > 0 ? `${days}天 ` : "";
+      return `${dh}${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+    };
+
+    const update = () => {
+      const now = new Date();
+      const due = parseDue();
+      const diff = due.getTime() - now.getTime();
+      if (diff >= 0) {
+        setCountdown({ text: `剩余 ${fmt(diff)}`, overtime: false });
+      } else {
+        setCountdown({ text: `超时 ${fmt(diff)}`, overtime: true });
+      }
+    };
+
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [summary?.due_end_date]);
+
   // 组件卸载时断开SSE连接
   useEffect(() => {
     return () => {
@@ -238,7 +281,13 @@ export default function ShareRepaymentPage() {
               </div>
             </div>
             <div className="flex items-center justify-center">
-              <span className="font-bold text-2xl">{summary.due_end_date}</span>
+              <span
+                className={`font-bold text-2xl ${
+                  countdown.overtime ? "text-red-600" : "text-gray-900"
+                }`}
+              >
+                {countdown.text}
+              </span>
             </div>
             <div className="flex flex-col">
               <div className="text-sm text-gray-600 mb-2">还款进度</div>
@@ -275,16 +324,32 @@ export default function ShareRepaymentPage() {
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <div className="flex gap-2 justify-between">
-                <button className="bg-green-500 text-white px-2 py-1 rounded-md">
-                  微信
-                </button>
-                <button className="bg-blue-500 text-white px-2 py-1 rounded-md">
-                  支付宝
-                </button>
-                <button className="bg-yellow-500 text-white px-2 py-1 rounded-md">
+              <div className="flex gap-4 items-center flex-wrap">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.payment_method === "wechat_pay"}
+                    onChange={(e) => {
+                      if (e.target.checked)
+                        setForm({ ...form, payment_method: "wechat_pay" });
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">微信</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.payment_method === "ali_pay"}
+                    onChange={(e) => {
+                      if (e.target.checked)
+                        setForm({ ...form, payment_method: "ali_pay" });
+                    }}
+                  />
+                  <span className="text-sm text-gray-700">支付宝</span>
+                </label>
+                <span className="inline-flex items-center bg-yellow-500 text-white px-2 py-1 rounded-md text-sm">
                   {summary.count}期
-                </button>
+                </span>
               </div>
               <div className="flex gap-2 justify-between">
                 <input
