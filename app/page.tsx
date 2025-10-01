@@ -8,7 +8,6 @@ export default function Home() {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             贷款信息管理系统
           </h1>
-          <p className="text-xl text-gray-600">请选择您的登录方式</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8">
@@ -44,37 +43,7 @@ export default function Home() {
             </div>
           </Link>
 
-          {/* 用户登录卡片 */}
-          <Link href="/login/user" className="group">
-            <div className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 border border-gray-200 hover:border-green-300">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <svg
-                    className="w-10 h-10 text-white"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-3">
-                  用户登录
-                </h2>
-                <p className="text-gray-600 mb-6">
-                  登录用户端，查看支付记录和账户信息
-                </p>
-                <div className="bg-green-50 text-green-700 px-4 py-2 rounded-lg text-sm">
-                  点击进入用户登录页面
-                </div>
-              </div>
-            </div>
-          </Link>
+
         </div>
 
         {/* 功能说明 */}

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "微信支付系统",
-  description: "微信支付管理系统",
+  title: "贷款系统",
+  description: "贷款系统",
 };
 
 export default function RootLayout({
