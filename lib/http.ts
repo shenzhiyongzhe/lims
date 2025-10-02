@@ -49,14 +49,34 @@ async function coreFetch<T>(
   const timer = setTimeout(() => controller.abort(), timeout);
 
   const finalUrl = `${BASE_URL}${url}${buildQuery(params)}`;
+  // 从 localStorage 获取用户信息并添加到 Authorization header
+  const getAuthHeaders = (): Record<string, string> => {
+    if (typeof window !== "undefined") {
+      const adminData = localStorage.getItem("admin");
+      if (adminData) {
+        try {
+          const admin = JSON.parse(adminData);
+          return {
+            Authorization: `Bearer ${btoa(JSON.stringify(admin))}`,
+          };
+        } catch (e) {
+          console.error("Failed to parse admin data:", e);
+        }
+      }
+    }
+    return {};
+  };
+
   const init: RequestInit = {
     method,
     headers: {
       ...(json && method !== "GET"
         ? { "Content-Type": "application/json" }
         : {}),
-      ...headers,
+      ...getAuthHeaders(), // 添加认证头
+      ...(headers as Record<string, string>),
     },
+    credentials: "include", // 确保发送 cookie
     signal: controller.signal,
   };
 

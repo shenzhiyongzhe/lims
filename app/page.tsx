@@ -49,11 +49,9 @@ export default function AdminLogin() {
       if (res.valid) {
         localStorage.setItem("admin", JSON.stringify(res.data));
         router.push(`/page/${roleZhToEn(res.data.role)}`);
-      } else {
-        setError(res.message || "登录失败");
       }
     } catch (err: any) {
-      setError(err.message || "登录失败");
+      // setError(err.message || "登录失败");
     }
   };
 

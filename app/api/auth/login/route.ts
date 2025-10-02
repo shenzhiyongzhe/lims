@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       path: "/",
       maxAge: 7 * 24 * 60 * 60, // 7天
       httpOnly: true, // 防止 XSS 攻击
-      secure: process.env.NODE_ENV === "production", // 生产环境使用 HTTPS
+      secure: false, // 暂时设为 false，等 HTTPS 配置好后再改为 true
       sameSite: "lax",
     });
     return response;

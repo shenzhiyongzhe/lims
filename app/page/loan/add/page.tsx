@@ -169,7 +169,7 @@ export default function AddLoanPlanPage() {
         form
       );
       setMessage(res.message);
-      router.push(`/admin/dashboard/loan/${res.data.id}`);
+      router.push(`/page/loan/${res.data.id}`);
     } catch (error: any) {
       setMessage(error.message);
     }

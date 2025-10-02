@@ -95,7 +95,7 @@ export default function AdminUsersPage() {
     }));
   };
   const fetchPayeeOptions = async () => {
-    const res = await get("/api/admin?role=收款人");
+    const res = await get("/api/admin-management?role=收款人");
     setPayeeOptions(res.data);
   };
   const fetchPayeeUsers = async () => {

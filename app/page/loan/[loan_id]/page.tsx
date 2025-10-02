@@ -28,7 +28,7 @@ export default function LoanSchedulePage() {
   async function fetchSchedules() {
     setScheduleLoading(true);
     try {
-      const res = await get(`/api/collector/schedules?loan_id=${loanId}`);
+      const res = await get(`/api/schedules?loan_id=${loanId}`);
       setSchedules(res.data || []);
     } catch (error) {
       console.error("获取还款计划失败:", error);

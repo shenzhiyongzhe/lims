@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-
+import { useRouter } from "next/navigation";
 type User = {
   id: number;
   username: string;
@@ -46,6 +46,7 @@ type Pagination = {
 };
 
 export default function MyCustomersPage() {
+  const router = useRouter();
   const [data, setData] = useState<UserWithLoans[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -162,7 +163,12 @@ export default function MyCustomersPage() {
                       >
                         <div className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div className="text-sm text-gray-700 flex flex-wrap gap-x-4 gap-y-2">
-                            <span>
+                            <span
+                              className="text-blue-400"
+                              onClick={() =>
+                                router.push(`/page/loan/${account.id}`)
+                              }
+                            >
                               <span className="text-gray-500">贷款ID：</span>
                               <span className="font-medium text-gray-900">
                                 {account.id}

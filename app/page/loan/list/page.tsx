@@ -105,7 +105,7 @@ function InnerScheduleListPage() {
               setPage(1);
               setStatus(next);
               router.replace(
-                `/admin/dashboard/loan/list?status=${encodeURIComponent(
+                `/page/loan/list?status=${encodeURIComponent(
                   next
                 )}&page=1&pageSize=${pageSize}`
               );
@@ -204,10 +204,8 @@ function InnerScheduleListPage() {
                   <td className="px-4 py-2">{r.id}</td>
                   <td className="px-4 py-2">{r.loan_id}</td>
                   <td
-                    className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded text-sm"
-                    onClick={() =>
-                      router.push(`/admin/dashboard/loan/${r.loan_id}`)
-                    }
+                    className="px-4 py-2 text-blue-600 hover:bg-blue-50 rounded text-sm cursor-pointer"
+                    onClick={() => router.push(`/page/loan/${r.loan_id}`)}
                   >
                     方案
                   </td>
@@ -248,7 +246,7 @@ function InnerScheduleListPage() {
                 setPageSize(ps);
                 setPage(1);
                 router.replace(
-                  `/admin/dashboard/loan/list?status=${status}&page=${page}&pageSize=${pageSize}`
+                  `/page/loan/list?status=${status}&page=${page}&pageSize=${pageSize}`
                 );
                 fetchData(page, pageSize, status);
               }}
