@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/prisma/prisma";
-import { ManagementRoles } from "@prisma/client";
+import type { ManagementRoles } from "@prisma/client";
 
 export async function GET(req: Request) {
   try {

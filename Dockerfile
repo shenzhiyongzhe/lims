@@ -1,23 +1,21 @@
-# 尝试使用不同的基础镜像
-FROM node:18-slim AS base
-
-# 或者使用更小的镜像
-# FROM node:18-alpine3.18 AS base
+# 使用官方 Node.js 镜像
+FROM node:18-alpine AS base
 
 # 安装依赖阶段
 FROM base AS deps
-RUN apt-get update && apt-get install -y curl
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --only=production && npm cache clean --force
 
 # 构建阶段
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY package.json package-lock.json* ./
+RUN npm ci
 
+COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
@@ -28,8 +26,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN groupadd --system --gid 1001 nodejs
-RUN useradd --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
