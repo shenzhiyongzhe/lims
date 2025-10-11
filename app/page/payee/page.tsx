@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import OrderNotification from "@/app/_components/OrderNotification";
+import { get, put } from "@/lib/http";
 
 export default function PayeeOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -10,9 +11,8 @@ export default function PayeeOrdersPage() {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/orders?today=true", { method: "GET" });
-      const json = await res.json();
-      setOrders(Array.isArray(json?.data) ? json.data : []);
+      const res = await get("/orders?today=true");
+      setOrders(Array.isArray(res.data) ? res.data : []);
     } finally {
       setLoading(false);
     }
@@ -29,12 +29,11 @@ export default function PayeeOrdersPage() {
 
   const handleComplete = async (id: string) => {
     try {
-      const res = await fetch("/api/orders", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status: "completed" }),
+      const res = await put("/orders", {
+        id,
+        status: "completed",
       });
-      const json = await res.json();
+      const json = await res.data;
       if (json.data) {
         setOrders((prev) =>
           prev.map((o) => (o.id === id ? { ...o, status: "completed" } : o))

@@ -68,7 +68,7 @@ export default function AdminUsersPage() {
   const addNew = async () => {
     setSubmitting(true);
     try {
-      const res = await post("/api/payee/management", {
+      const res = await post("/payees", {
         admin_id: form.admin_id,
         username: form.username,
         address: form.address,
@@ -95,14 +95,14 @@ export default function AdminUsersPage() {
     }));
   };
   const fetchPayeeOptions = async () => {
-    const res = await get("/api/admin-management?role=收款人");
+    const res = await get("/admins/role?role=收款人");
     setPayeeOptions(res.data);
   };
   const fetchPayeeUsers = async () => {
     setPayeeLoading(true);
     try {
       if (payeeOptions.length) return;
-      const res = await get("/api/payee/management");
+      const res = await get("/payees");
       setUsers(res.data);
     } catch (error) {
       console.log(error);

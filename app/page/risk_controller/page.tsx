@@ -82,7 +82,7 @@ export default function FrontUsersPage() {
       return;
     setSubmitting(true);
     try {
-      await post("/api/user", form);
+      await post("/user", form);
       setOpen(false);
       setForm({ username: "", phone: "", password: "", address: "" });
     } catch (e: any) {

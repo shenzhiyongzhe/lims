@@ -66,8 +66,8 @@ export default function AddLoanPlanPage() {
   const fetchUsers = async (query: string) => {
     setUsersLoading(true);
     try {
-      const res = await get(`/api/customers/management?search=${query}`);
-      setUsers(res.data || []);
+      const res = await get(`/users?search=${query}`);
+      setUsers(res.data.data || []);
     } catch (error) {
       console.error("获取用户列表失败:", error);
     } finally {
@@ -85,7 +85,7 @@ export default function AddLoanPlanPage() {
     setLoading(true);
     try {
       if (current.length) return;
-      const res = await get(`/api/admin-management?role=${role}`);
+      const res = await get(`/admins/role?role=${role}`);
       setOptions(res.data || []);
     } catch (error) {
       console.error(`获取 ${role} 列表失败:`, error);
@@ -165,7 +165,7 @@ export default function AddLoanPlanPage() {
     e.preventDefault();
     try {
       const res = await post<{ message: string; data: { id: number } }>(
-        "/api/loan",
+        "/loan-accounts",
         form
       );
       setMessage(res.message);

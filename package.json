@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --turbopack -p 3001",
     "build": "next build --turbopack",
-    "start": "next start",
+    "start": "next start -p 3001",
     "cron:run": "node ./scripts/cron-runner.js",
-    "start:cron": "concurrently \"next start\" \"node ./scripts/cron-runner.js\"",
-    "dev:cron": "concurrently \"next dev --turbopack\" \"node ./scripts/cron-runner.js\""
+    "start:cron": "concurrently \"next start -p 3001\" \"node ./scripts/cron-runner.js\"",
+    "dev:cron": "concurrently \"next dev --turbopack -p 3001\" \"node ./scripts/cron-runner.js\""
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",

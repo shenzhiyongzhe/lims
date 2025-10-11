@@ -13,8 +13,8 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/page/admin-users-management", label: "管理员用户管理", icon: "🏠" },
-  { href: "/page/customers/management", label: "贷款用户管理", icon: "🏠" },
+  { href: "/page/admin/management", label: "管理员用户管理", icon: "🏠" },
+  { href: "/page/users/management", label: "贷款用户管理", icon: "🏠" },
   {
     href: "/page/loan/list",
     label: "贷款列表",
@@ -73,7 +73,7 @@ export default function Sidebar() {
   async function handleLogout(e: React.MouseEvent) {
     e.preventDefault();
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/auth/logout", { method: "POST" });
     } finally {
       router.replace("/page/login");
     }

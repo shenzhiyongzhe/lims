@@ -3,7 +3,7 @@ import { prisma } from "@/prisma/prisma";
 import { requireAuth } from "@/lib/auth";
 
 // 高风险用户查询
-// GET /api/users/high_risk?collector=张三&page=1&pageSize=20
+// GET /users/high_risk?collector=张三&page=1&pageSize=20
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req);

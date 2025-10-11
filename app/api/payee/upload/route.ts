@@ -4,6 +4,8 @@ import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
 import { requireAuth } from "@/lib/auth";
+import { prisma } from "@/prisma/prisma";
+import { type PaymentMethod } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,12 +14,27 @@ export async function POST(req: NextRequest) {
     const auth = requireAuth(req);
     const qrcode_type = data.get("qrcode_type") as string;
 
+    console.log("Upload request data:", {
+      hasFile: !!file,
+      fileName: file?.name,
+      fileType: file?.type,
+      fileSize: file?.size,
+      qrcode_type,
+      authId: auth.id,
+    });
+
     if (!file) {
       return NextResponse.json({ message: "没有文件" }, { status: 400 });
     }
 
     if (!auth.id || !qrcode_type) {
-      return NextResponse.json({ message: "缺少必要参数" }, { status: 400 });
+      return NextResponse.json(
+        {
+          message: "缺少必要参数",
+          details: { authId: auth.id, qrcode_type },
+        },
+        { status: 400 }
+      );
     }
 
     // 验证文件类型
@@ -56,8 +73,39 @@ export async function POST(req: NextRequest) {
     // 返回文件访问路径
     const fileUrl = `/uploads/payee/${filename}`;
 
+    // 获取收款人信息
+    const payee = await prisma.payee.findFirst({
+      where: {
+        admin_id: auth.id,
+      },
+    });
+
+    if (!payee) {
+      return NextResponse.json({ message: "收款人不存在" }, { status: 404 });
+    }
+
+    // 创建二维码记录
+    const qrCode = await prisma.qrCode.create({
+      data: {
+        payee_id: payee.id,
+        qrcode_type: qrcode_type as PaymentMethod,
+        qrcode_url: fileUrl,
+        active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    });
+
     return NextResponse.json({
-      message: "上传成功",
+      message: "上传并创建成功",
+      data: {
+        id: qrCode.id,
+        qrcode_url: fileUrl,
+        qrcode_type: qrcode_type,
+        active: true,
+        created_at: qrCode.created_at,
+        updated_at: qrCode.updated_at,
+      },
       url: fileUrl,
       filename: filename,
       size: file.size,

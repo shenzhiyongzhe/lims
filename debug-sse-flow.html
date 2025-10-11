@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>SSE Flow Debug Tool</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .success {
+      background-color: #d4edda;
+      border-color: #c3e6cb;
+    }
+
+    .error {
+      background-color: #f8d7da;
+      border-color: #f5c6cb;
+    }
+
+    .info {
+      background-color: #d1ecf1;
+      border-color: #bee5eb;
+    }
+
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 3px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>SSE Flow Debug Tool</h1>
+
+  <div class="section info">
+    <h3>1. 检查localStorage中的admin数据</h3>
+    <button onclick="checkAdminData()">检查Admin数据</button>
+    <div id="adminData"></div>
+  </div>
+
+  <div class="section info">
+    <h3>2. 测试Payee SSE连接</h3>
+    <button onclick="testPayeeSSE()">连接Payee SSE</button>
+    <div id="payeeSSE"></div>
+  </div>
+
+  <div class="section info">
+    <h3>3. 测试订单提交</h3>
+    <button onclick="testSubmitOrder()">提交测试订单</button>
+    <div id="submitOrder"></div>
+  </div>
+
+  <div class="section info">
+    <h3>4. 检查NestJS服务器状态</h3>
+    <button onclick="checkNestJSStatus()">检查服务器</button>
+    <div id="nestJSStatus"></div>
+  </div>
+
+  <div class="section">
+    <h3>调试日志</h3>
+    <div id="logs"></div>
+  </div>
+
+  <script>
+    const BASE_URL = 'http://localhost:3000';
+    let payeeEventSource = null;
+
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const logDiv = document.getElementById('logs');
+      const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'black';
+      logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+      console.log(`[${timestamp}] ${message}`);
+    }
+
+    function checkAdminData() {
+      const adminData = localStorage.getItem('admin');
+      const div = document.getElementById('adminData');
+
+      if (!adminData) {
+        div.innerHTML = '<div class="error">❌ 没有找到admin数据</div>';
+        log('❌ 没有找到admin数据', 'error');
+        return;
+      }
+
+      try {
+        const admin = JSON.parse(adminData);
+        div.innerHTML = `
+                    <div class="success">✅ Admin数据存在</div>
+                    <pre>${JSON.stringify(admin, null, 2)}</pre>
+                `;
+        log(`✅ Admin数据: ${JSON.stringify(admin)}`, 'success');
+      } catch (error) {
+        div.innerHTML = '<div class="error">❌ Admin数据格式错误</div>';
+        log(`❌ Admin数据解析错误: ${error.message}`, 'error');
+      }
+    }
+
+    function testPayeeSSE() {
+      const adminData = localStorage.getItem('admin');
+      if (!adminData) {
+        document.getElementById('payeeSSE').innerHTML = '<div class="error">❌ 请先检查Admin数据</div>';
+        return;
+      }
+
+      try {
+        const admin = JSON.parse(adminData);
+        const url = `${BASE_URL}/events?type=payee&admin_id=${admin.id}`;
+
+        log(`🔗 连接Payee SSE: ${url}`);
+
+        if (payeeEventSource) {
+          payeeEventSource.close();
+        }
+
+        payeeEventSource = new EventSource(url);
+
+        payeeEventSource.onopen = function (event) {
+          document.getElementById('payeeSSE').innerHTML = '<div class="success">✅ Payee SSE连接成功</div>';
+          log('✅ Payee SSE连接成功', 'success');
+        };
+
+        payeeEventSource.onmessage = function (event) {
+          const message = JSON.parse(event.data);
+          log(`📨 收到消息: ${JSON.stringify(message)}`, 'info');
+
+          if (message.type === 'connected') {
+            document.getElementById('payeeSSE').innerHTML += '<div class="success">✅ 收到连接确认消息</div>';
+          } else if (message.type === 'new_order') {
+            document.getElementById('payeeSSE').innerHTML += '<div class="success">🎉 收到新订单通知!</div>';
+          }
+        };
+
+        payeeEventSource.onerror = function (error) {
+          document.getElementById('payeeSSE').innerHTML = '<div class="error">❌ Payee SSE连接失败</div>';
+          log(`❌ Payee SSE连接失败: ${JSON.stringify(error)}`, 'error');
+        };
+
+      } catch (error) {
+        document.getElementById('payeeSSE').innerHTML = '<div class="error">❌ 创建SSE连接失败</div>';
+        log(`❌ 创建SSE连接失败: ${error.message}`, 'error');
+      }
+    }
+
+    function testSubmitOrder() {
+      const testOrder = {
+        type: "submit_order",
+        data: {
+          id: "test-order-" + Date.now(),
+          share_id: "test-share",
+          customer_id: 1,
+          customer: {
+            username: "测试用户",
+            phone: "12345678901",
+            address: "测试地址"
+          },
+          amount: "100",
+          payment_method: "wechat_pay",
+          remark: "测试订单",
+          loan_id: 1,
+          payment_periods: 1
+        }
+      };
+
+      log(`📤 提交测试订单: ${JSON.stringify(testOrder)}`);
+
+      fetch(`${BASE_URL}/events`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testOrder)
+      })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('submitOrder').innerHTML = `
+                    <div class="success">✅ 订单提交成功</div>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+          log(`✅ 订单提交成功: ${JSON.stringify(data)}`, 'success');
+        })
+        .catch(error => {
+          document.getElementById('submitOrder').innerHTML = `
+                    <div class="error">❌ 订单提交失败</div>
+                    <pre>${error.message}</pre>
+                `;
+          log(`❌ 订单提交失败: ${error.message}`, 'error');
+        });
+    }
+
+    function checkNestJSStatus() {
+      fetch(`${BASE_URL}/events?type=payee&admin_id=1`, { method: 'HEAD' })
+        .then(response => {
+          document.getElementById('nestJSStatus').innerHTML = `
+                    <div class="success">✅ NestJS服务器响应正常</div>
+                    <div>状态码: ${response.status}</div>
+                    <div>响应头: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}</div>
+                `;
+          log(`✅ NestJS服务器状态: ${response.status}`, 'success');
+        })
+        .catch(error => {
+          document.getElementById('nestJSStatus').innerHTML = `
+                    <div class="error">❌ NestJS服务器无响应</div>
+                    <div>错误: ${error.message}</div>
+                `;
+          log(`❌ NestJS服务器无响应: ${error.message}`, 'error');
+        });
+    }
+
+    // 页面加载时自动检查
+    window.onload = function () {
+      checkAdminData();
+      checkNestJSStatus();
+    };
+  </script>
+</body>
+
+</html>

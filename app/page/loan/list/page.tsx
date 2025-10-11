@@ -52,9 +52,7 @@ function InnerScheduleListPage() {
     setError("");
     try {
       const res = await fetch(
-        `/api/loan/status?status=${encodeURIComponent(
-          st
-        )}&page=${p}&pageSize=${ps}`
+        `/loan/status?status=${encodeURIComponent(st)}&page=${p}&pageSize=${ps}`
       );
       const json: Resp = await res.json();
       if (!res.ok) throw new Error((json as any)?.message || "加载失败");

@@ -54,7 +54,7 @@ export default function StatsPage() {
     setLoading(true);
     setError("");
     try {
-      const url = `/api/stats/collector${
+      const url = `/stats/collector${
         collector ? `?collector=${encodeURIComponent(collector)}` : ""
       }`;
       const res = await fetch(url);
@@ -71,7 +71,7 @@ export default function StatsPage() {
   const fetchOverdue = async () => {
     setOverdueError("");
     try {
-      const url = `/api/stats/overdue${
+      const url = `/stats/overdue${
         collector ? `?collector=${encodeURIComponent(collector)}` : ""
       }`;
       const res = await fetch(url);
@@ -86,7 +86,7 @@ export default function StatsPage() {
     setRiskLoading(true);
     setRiskError("");
     try {
-      const url = `/api/customers/high_risk${
+      const url = `/customers/high_risk${
         collector ? `?collector=${encodeURIComponent(collector)}` : ""
       }`;
       const res = await get(url);

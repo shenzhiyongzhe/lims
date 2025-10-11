@@ -29,7 +29,7 @@ export default function AdminLogin() {
     setError("");
 
     try {
-      const res = await post("/api/auth/login", formData);
+      const res = await post("/admins/login", formData);
       if (res.message === "登录成功") {
         localStorage.setItem("admin", JSON.stringify(res.data));
         router.push(`/page/${roleZhToEn(res.data.role)}`);
@@ -45,7 +45,7 @@ export default function AdminLogin() {
 
   const checkLogin = async () => {
     try {
-      const res = await get("/api/auth/verify");
+      const res = await get("/admins/verify");
       if (res.valid) {
         localStorage.setItem("admin", JSON.stringify(res.data));
         router.push(`/page/${roleZhToEn(res.data.role)}`);

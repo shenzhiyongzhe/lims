@@ -41,7 +41,7 @@ function post(path) {
 
 async function runOverdue() {
   try {
-    const res = await post("/api/cron/overdue");
+    const res = await post("/cron/overdue");
     console.log(`[cron] overdue -> ${res.status} ${res.body}`);
   } catch (e) {
     console.error("[cron] overdue error", e);
@@ -50,7 +50,7 @@ async function runOverdue() {
 
 async function runScheduleStatus() {
   try {
-    const res = await post("/api/cron/schedule-status");
+    const res = await post("/cron/schedule-status");
     console.log(`[cron] schedule-status -> ${res.status} ${res.body}`);
   } catch (e) {
     console.error("[cron] schedule-status error", e);

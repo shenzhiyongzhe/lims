@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { get } from "@/lib/http";
+
+// 使用NestJS后端地址，端口3000
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
 interface SSEMessage {
   type: string;
@@ -24,12 +28,14 @@ export function useSSE({
 }: UseSSEOptions) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<SSEMessage | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
-  const connect = (connectUrl?: string) => {
+  const connect = async (connectUrl?: string) => {
     const targetUrl = connectUrl || url;
     if (!targetUrl) {
       console.warn("No URL provided for SSE connection");
+      setConnectionError("No URL provided for SSE connection");
       return;
     }
 
@@ -38,12 +44,69 @@ export function useSSE({
       disconnect();
     }
 
+    // 从localStorage获取admin信息并添加到URL参数
+    let finalUrl = targetUrl;
+
+    if (targetUrl.includes("type=payee")) {
+      try {
+        // 从localStorage获取admin信息
+        const adminData = localStorage.getItem("admin");
+        if (!adminData) {
+          setConnectionError("No admin data found in localStorage");
+          return;
+        }
+
+        const admin = JSON.parse(adminData);
+        if (!admin.id) {
+          setConnectionError("Invalid admin data: missing id");
+          return;
+        }
+
+        // 将admin.id添加到URL参数
+        const urlObj = new URL(
+          targetUrl.startsWith("http") ? targetUrl : `${BASE_URL}${targetUrl}`
+        );
+        urlObj.searchParams.set("admin_id", admin.id.toString());
+        finalUrl = urlObj.toString();
+
+        console.log("Admin ID from localStorage:", admin.id);
+      } catch (error) {
+        console.error("Error parsing admin data:", error);
+        setConnectionError("Failed to parse admin data from localStorage");
+        return;
+      }
+    }
+
+    // 构建完整的 SSE URL
+    const fullUrl = finalUrl.startsWith("http")
+      ? finalUrl
+      : `${BASE_URL}${finalUrl}`;
+
+    console.log("SSE connection details:", {
+      targetUrl,
+      baseUrl: BASE_URL,
+      fullUrl,
+      readyState: eventSourceRef.current?.readyState,
+    });
+
+    // 测试NestJS服务器连接
+    console.log("Testing NestJS server connection...");
+    console.log("BASE_URL:", BASE_URL);
+    console.log("Full URL:", fullUrl);
+    console.log("Admin data from localStorage:", localStorage.getItem("admin"));
+
+    // 清除之前的错误
+    setConnectionError(null);
+
     try {
-      console.log("Connecting to SSE:", targetUrl);
-      eventSourceRef.current = new EventSource(targetUrl);
+      console.log("Creating EventSource for:", fullUrl);
+      eventSourceRef.current = new EventSource(fullUrl);
 
       eventSourceRef.current.onopen = () => {
-        console.log("SSE connected:", targetUrl);
+        console.log("SSE connected successfully:", {
+          url: fullUrl,
+          readyState: eventSourceRef.current?.readyState,
+        });
         setIsConnected(true);
         onOpen?.();
       };
@@ -59,7 +122,17 @@ export function useSSE({
       };
 
       eventSourceRef.current.onerror = (error) => {
-        console.error("SSE connection error:", error);
+        const errorMessage = `SSE connection failed: ${eventSourceRef.current?.url} (readyState: ${eventSourceRef.current?.readyState})`;
+        console.error("SSE connection error details:", {
+          error,
+          readyState: eventSourceRef.current?.readyState,
+          url: eventSourceRef.current?.url,
+          type: error.type,
+          target: error.target,
+          timeStamp: error.timeStamp,
+          errorMessage,
+        });
+        setConnectionError(errorMessage);
         setIsConnected(false);
         onError?.(error);
       };
@@ -69,7 +142,9 @@ export function useSSE({
         onClose?.();
       });
     } catch (error) {
+      const errorMessage = `Failed to create SSE connection: ${error}`;
       console.error("Failed to create SSE connection:", error);
+      setConnectionError(errorMessage);
     }
   };
 
@@ -84,7 +159,10 @@ export function useSSE({
 
   useEffect(() => {
     if (autoConnect && url) {
-      connect();
+      connect().catch((error) => {
+        console.error("Failed to connect to SSE:", error);
+        setConnectionError(`Failed to connect: ${error.message}`);
+      });
     }
 
     return () => {
@@ -95,6 +173,7 @@ export function useSSE({
   return {
     isConnected,
     lastMessage,
+    connectionError,
     connect,
     disconnect,
   };

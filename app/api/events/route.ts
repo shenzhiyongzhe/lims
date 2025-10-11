@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/prisma/prisma";
+import { requireAuth } from "@/lib/auth";
 
 // 存储活跃的SSE连接
 const sseConnections = new Map<string, ReadableStreamDefaultController>();
@@ -13,12 +14,28 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type"); // "customer" or "payee"
   const userId = searchParams.get("user_id");
-  // 从cookie获取ID
-  const cookies = req.cookies;
-  const payeeId = cookies.get("payee_id")?.value;
 
-  if (type === "payee" && !payeeId) {
-    return new Response("Missing payee_id", { status: 400 });
+  let payeeId: number | null = null;
+
+  if (type === "payee") {
+    try {
+      // 根据admin.id查询payee
+      const auth = requireAuth(req);
+      const payee = await prisma.payee.findFirst({
+        where: {
+          admin_id: auth.id,
+        },
+      });
+
+      if (!payee) {
+        return new Response("收款人不存在", { status: 404 });
+      }
+
+      payeeId = payee.id;
+    } catch (error) {
+      console.error("Error getting payee:", error);
+      return new Response("认证失败", { status: 401 });
+    }
   }
 
   if (type === "customer" && !userId) {
@@ -33,8 +50,8 @@ export async function GET(req: NextRequest) {
       // 存储连接
       sseConnections.set(connectionId, controller);
 
-      if (type === "payee") {
-        payeeConnections.set(Number(payeeId), connectionId);
+      if (type === "payee" && payeeId) {
+        payeeConnections.set(payeeId, connectionId);
       } else if (type === "customer") {
         customerConnections.set(Number(userId), connectionId);
       }
@@ -51,8 +68,8 @@ export async function GET(req: NextRequest) {
       // 处理连接关闭
       req.signal.addEventListener("abort", () => {
         sseConnections.delete(connectionId);
-        if (type === "payee") {
-          payeeConnections.delete(Number(payeeId));
+        if (type === "payee" && payeeId) {
+          payeeConnections.delete(payeeId);
         } else if (type === "customer") {
           customerConnections.delete(Number(userId));
         }

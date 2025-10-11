@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { useSSE } from "@/app/_hooks/useSSE";
+import { get, post } from "@/lib/http";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 const colorMap: { [key: string]: string } = {
   pending: "bg-yellow-100 text-yellow-800",
   active: "bg-blue-100 text-blue-800",
@@ -40,11 +43,28 @@ export default function ShareRepaymentPage() {
     overtime: boolean;
   }>({ text: "--", overtime: false });
 
+  // 定时器引用
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 构建完整的图片URL
+  const getFullImageUrl = (url: string) => {
+    if (url.startsWith("http")) {
+      return url; // 已经是完整URL
+    }
+    return `${BASE_URL}${url}`;
+  };
+
   // SSE连接 - 不自动连接，手动控制
   const { isConnected, connect, disconnect } = useSSE({
     autoConnect: false, // 不自动连接
     onMessage: (message) => {
       if (message.type === "order_grabbed") {
+        // 清除超时定时器
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+
         setOrderStatus("grabbed");
         setGrabbedPayee(message.data);
         // 抢单成功后获取二维码
@@ -65,7 +85,7 @@ export default function ShareRepaymentPage() {
     // 在提交订单时连接SSE
     if (!isConnected) {
       console.log("form.user_id", form.user_id);
-      const sseUrl = `/api/events?type=customer&user_id=${form.user_id}`;
+      const sseUrl = `/events?type=customer&user_id=${form.user_id}`;
       connect(sseUrl);
     }
 
@@ -88,32 +108,34 @@ export default function ShareRepaymentPage() {
     };
 
     try {
-      const response = await fetch("/api/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: "submit_order",
-          data: orderData,
-        }),
+      const response = await post("/events", {
+        type: "submit_order",
+        data: orderData,
       });
 
-      const result = await response.json();
+      const result = await response.data;
       if (!result.success) {
         throw new Error(result.message);
       }
 
       // 等待抢单结果
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         if (orderStatus === "pending") {
+          console.log("orderStatus === 'pending'");
           setOrderStatus("failed");
           setError("暂无收款人接单，请稍后再试");
           // 超时后断开SSE连接
           disconnect();
         }
+        timeoutRef.current = null;
       }, 60000); // 60秒超时
     } catch (error: any) {
+      // 清除超时定时器
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
       setError(error.message);
       setOrderStatus("failed");
       // 出错后断开SSE连接
@@ -124,15 +146,34 @@ export default function ShareRepaymentPage() {
   const fetchQrcode = async (payeeId: number) => {
     try {
       setQrcodeLoading(true);
-      const response = await fetch(
-        `/api/payee/qrcode?payment_method=${form.payment_method}&active=true&payee_id=${payeeId}`
+      console.log(
+        `🔍 获取收款人 ${payeeId} 的二维码，支付方式: ${form.payment_method}`
       );
-      const result = await response.json();
-      if (!response.ok) {
+
+      const result = await get(
+        `/payees/qrcode?payment_method=${form.payment_method}&active=true&payee_id=${payeeId}`
+      );
+
+      console.log("📱 二维码API响应:", result);
+
+      if (result.code != 200) {
         throw new Error(result.message || "获取数据失败");
       }
-      setQrcode(result.data[0]);
+
+      if (
+        !result.data ||
+        !Array.isArray(result.data) ||
+        result.data.length === 0
+      ) {
+        throw new Error("没有找到匹配的二维码");
+      }
+
+      const qrcodeData = result.data[0];
+      console.log("📱 找到二维码数据:", qrcodeData);
+
+      setQrcode(qrcodeData.qrcode_url);
     } catch (error: any) {
+      console.error("❌ 获取二维码失败:", error);
       setError(error.message);
     } finally {
       setQrcodeLoading(false);
@@ -142,19 +183,21 @@ export default function ShareRepaymentPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`/api/share/${token}`);
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.message || "获取数据失败");
+        const response = await get(`/share-links/${token}`);
+        if (response.code != 200) {
+          throw new Error(response.message || "获取数据失败");
         }
-        setSummary(result.summary);
+        setSummary(response.data.summary);
         setForm((prev: any) => ({
           ...prev,
-          user_id: result.summary.user.id,
-          loan_id: result.summary.loan_id,
-          payment_periods: result.summary.count,
+          user_id: response.data.summary.user.id,
+          loan_id: response.data.summary.loan_id,
+          payment_periods: response.data.summary.count,
         }));
-        console.log("result.summary.user.user_id", result.summary.user.id);
+        console.log(
+          "result.summary.user.user_id",
+          response.data.summary.user.id
+        );
       } catch (error: any) {
         setError(error.message);
       } finally {
@@ -206,9 +249,15 @@ export default function ShareRepaymentPage() {
     return () => clearInterval(timer);
   }, [summary?.due_end_date]);
 
-  // 组件卸载时断开SSE连接
+  // 组件卸载时断开SSE连接并清除定时器
   useEffect(() => {
     return () => {
+      // 清除超时定时器
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      // 断开SSE连接
       disconnect();
     };
   }, []);
@@ -424,9 +473,16 @@ export default function ShareRepaymentPage() {
                   </h3>
                   <div className="inline-block p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm">
                     <img
-                      src={qrcode.qrcode_url}
+                      src={getFullImageUrl(qrcode)}
                       alt="支付二维码"
                       className="w-48 h-48 object-contain"
+                      onError={(e) => {
+                        console.error("❌ 二维码图片加载失败:", e);
+                        setError("二维码加载失败，请刷新页面重试");
+                      }}
+                      onLoad={() => {
+                        console.log("✅ 二维码图片加载成功");
+                      }}
                     />
                   </div>
                 </div>

@@ -10,6 +10,8 @@ export default function LoanSchedulePage() {
 
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [schedules, setSchedules] = useState<any[]>([]);
+  const [loanInfo, setLoanInfo] = useState<any>(null);
+  const [userInfo, setUserInfo] = useState<any>(null);
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const [editScheduleForm, setEditScheduleForm] = useState({
     due_amount: 0,
@@ -28,10 +30,18 @@ export default function LoanSchedulePage() {
   async function fetchSchedules() {
     setScheduleLoading(true);
     try {
-      const res = await get(`/api/schedules?loan_id=${loanId}`);
-      setSchedules(res.data || []);
+      const res = await get(`/loan-accounts/${loanId}`);
+      console.log("贷款详情API响应:", res);
+
+      if (res.code === 200 && res.data) {
+        setLoanInfo(res.data);
+        setUserInfo(res.data.user);
+        setSchedules(res.data.repaymentSchedules || []);
+      } else {
+        throw new Error(res.message || "获取数据失败");
+      }
     } catch (error) {
-      console.error("获取还款计划失败:", error);
+      console.error("获取贷款详情失败:", error);
     } finally {
       setScheduleLoading(false);
     }
@@ -71,12 +81,14 @@ export default function LoanSchedulePage() {
 
     try {
       const ids = Array.from(selectedSchedules);
-      const share_res = await post(`/api/collector/schedules/share`, { ids });
+      const share_res = await post("/share-links", { ids });
 
       if (share_res.data.shareUrl) {
         try {
           await navigator.clipboard.writeText(share_res.data.shareUrl);
-          alert(`已生成 ${selectedSchedules.size} 个分享链接并复制到剪贴板`);
+          alert(
+            `已生成 ${selectedSchedules.size} 期还款计划的分享链接并复制到剪贴板`
+          );
         } catch (error) {
           // 降级方案
           const textArea = document.createElement("textarea");
@@ -85,7 +97,9 @@ export default function LoanSchedulePage() {
           textArea.select();
           document.execCommand("copy");
           document.body.removeChild(textArea);
-          alert(`已生成 ${selectedSchedules.size} 个分享链接并复制到剪贴板`);
+          alert(
+            `已生成 ${selectedSchedules.size} 期还款计划的分享链接并复制到剪贴板`
+          );
         }
       }
       // 重置选择状态
@@ -120,7 +134,7 @@ export default function LoanSchedulePage() {
 
     try {
       await post(
-        `/api/collector/schedules/${editingSchedule.id}`,
+        `/repayment-schedules/${editingSchedule.id}`,
         editScheduleForm
       );
       // 刷新数据
@@ -158,139 +172,377 @@ export default function LoanSchedulePage() {
         </div>
 
         {/* 主要内容 */}
-        <div className="bg-white rounded-lg shadow-sm">
-          {scheduleLoading ? (
-            <div className="p-8 text-center text-gray-500">加载中...</div>
-          ) : (
-            <div className="p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  {!batchMode ? (
-                    <button
-                      onClick={handleBatchModeToggle}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                    >
-                      生成链接
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-2">
+        <div className="space-y-6">
+          {/* 用户信息卡片 */}
+          {userInfo && (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                用户信息
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    用户名
+                  </label>
+                  <p className="text-gray-900">{userInfo.username}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    手机号
+                  </label>
+                  <p className="text-gray-900">{userInfo.phone}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    地址
+                  </label>
+                  <p className="text-gray-900">{userInfo.address}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    用户等级
+                  </label>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      userInfo.lv === "青铜用户"
+                        ? "bg-gray-100 text-gray-800"
+                        : userInfo.lv === "白银用户"
+                        ? "bg-gray-200 text-gray-800"
+                        : userInfo.lv === "黄金用户"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    {userInfo.lv}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    超时次数
+                  </label>
+                  <p className="text-gray-900">{userInfo.overtime}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    逾期次数
+                  </label>
+                  <p className="text-gray-900">{userInfo.overdue_time}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    高风险用户
+                  </label>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      userInfo.is_high_risk
+                        ? "bg-red-100 text-red-800"
+                        : "bg-green-100 text-green-800"
+                    }`}
+                  >
+                    {userInfo.is_high_risk ? "是" : "否"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 贷款信息卡片 */}
+          {loanInfo && (
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">
+                贷款信息
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    贷款金额
+                  </label>
+                  <p className="text-lg font-semibold text-gray-900">
+                    ¥{loanInfo.loan_amount}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    本金
+                  </label>
+                  <p className="text-gray-900">¥{loanInfo.capital}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    利息
+                  </label>
+                  <p className="text-gray-900">¥{loanInfo.interest}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    手续费
+                  </label>
+                  <p className="text-gray-900">¥{loanInfo.handling_fee}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    总期数
+                  </label>
+                  <p className="text-gray-900">{loanInfo.total_periods}期</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    已还期数
+                  </label>
+                  <p className="text-gray-900">{loanInfo.repaid_periods}期</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    日还款额
+                  </label>
+                  <p className="text-gray-900">¥{loanInfo.daily_repayment}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    贷款状态
+                  </label>
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs ${
+                      loanInfo.status === "pending"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : loanInfo.status === "active"
+                        ? "bg-blue-100 text-blue-800"
+                        : loanInfo.status === "completed"
+                        ? "bg-green-100 text-green-800"
+                        : loanInfo.status === "overdue"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {loanInfo.status === "pending"
+                      ? "待放款"
+                      : loanInfo.status === "active"
+                      ? "进行中"
+                      : loanInfo.status === "completed"
+                      ? "已完成"
+                      : loanInfo.status === "overdue"
+                      ? "逾期"
+                      : loanInfo.status}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    风控人
+                  </label>
+                  <p className="text-gray-900">{loanInfo.risk_controller}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    负责人
+                  </label>
+                  <p className="text-gray-900">{loanInfo.collector}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    收款人
+                  </label>
+                  <p className="text-gray-900">{loanInfo.payee}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    打款人
+                  </label>
+                  <p className="text-gray-900">{loanInfo.lender}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    公司成本
+                  </label>
+                  <p className="text-gray-900">¥{loanInfo.company_cost}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    贷款开始日期
+                  </label>
+                  <p className="text-gray-900">
+                    {new Date(loanInfo.due_start_date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-500">
+                    贷款结束日期
+                  </label>
+                  <p className="text-gray-900">
+                    {new Date(loanInfo.due_end_date).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 还款计划卡片 */}
+          <div className="bg-white rounded-lg shadow-sm">
+            {scheduleLoading ? (
+              <div className="p-8 text-center text-gray-500">加载中...</div>
+            ) : (
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    还款计划
+                  </h2>
+                  <div className="flex items-center gap-4">
+                    {!batchMode ? (
                       <button
-                        onClick={handleSelectAll}
-                        className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                        onClick={handleBatchModeToggle}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                       >
-                        {selectedSchedules.size === schedules.length
-                          ? "取消全选"
-                          : "全选"}
+                        生成链接
                       </button>
-                      <span className="text-sm text-gray-600">
-                        已选择 {selectedSchedules.size} 项
-                      </span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={handleSelectAll}
+                          className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
+                        >
+                          {selectedSchedules.size === schedules.length
+                            ? "取消全选"
+                            : "全选"}
+                        </button>
+                        <span className="text-sm text-gray-600">
+                          已选择 {selectedSchedules.size} 项
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {batchMode && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleBatchCancel}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
+                        disabled={batchGenerating}
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={handleBatchGenerate}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
+                        disabled={
+                          batchGenerating || selectedSchedules.size === 0
+                        }
+                      >
+                        {batchGenerating ? "生成中..." : "确定生成"}
+                      </button>
                     </div>
                   )}
                 </div>
 
-                {batchMode && (
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleBatchCancel}
-                      className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
-                      disabled={batchGenerating}
-                    >
-                      取消
-                    </button>
-                    <button
-                      onClick={handleBatchGenerate}
-                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
-                      disabled={batchGenerating || selectedSchedules.size === 0}
-                    >
-                      {batchGenerating ? "生成中..." : "确定生成"}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* 表格 */}
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-center">期数</th>
-                      <th className="px-4 py-2 text-center">应还金额</th>
-                      <th className="px-4 py-2 text-center">截止日期</th>
-                      <th className="px-4 py-2 text-center">状态</th>
-                      <th className="px-4 py-2 text-center">操作</th>
-                      {batchMode && (
-                        <th className="px-4 py-2 text-center">生成链接</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {schedules.length > 0 ? (
-                      schedules.map((s: any) => (
-                        <tr key={s.id} className="border-t">
-                          <td className="px-4 py-2 text-center">{s.period}</td>
-                          <td className="px-4 py-2 text-center">
-                            ¥{s.due_amount}
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            {String(s.due_end_date).slice(0, 10)}
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                s.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : s.status === "paid"
-                                  ? "bg-green-100 text-green-800"
-                                  : s.status === "overdue"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {s.status === "pending"
-                                ? "待还款"
-                                : s.status === "paid"
-                                ? "已还款"
-                                : s.status === "overdue"
-                                ? "逾期"
-                                : s.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            <button
-                              onClick={() => handleEditSchedule(s)}
-                              className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
-                            >
-                              编辑
-                            </button>
-                          </td>
-                          {batchMode && (
-                            <td className="px-4 py-2 text-center">
-                              <input
-                                type="checkbox"
-                                checked={selectedSchedules.has(s.id)}
-                                onChange={() => handleScheduleSelect(s.id)}
-                                className="rounded"
-                              />
-                            </td>
-                          )}
-                        </tr>
-                      ))
-                    ) : (
+                {/* 表格 */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-50">
                       <tr>
-                        <td
-                          colSpan={batchMode ? 6 : 5}
-                          className="px-4 py-8 text-center text-gray-500"
-                        >
-                          暂无还款计划
-                        </td>
+                        <th className="px-4 py-2 text-center">期数</th>
+                        <th className="px-4 py-2 text-center">应还金额</th>
+                        <th className="px-4 py-2 text-center">本金</th>
+                        <th className="px-4 py-2 text-center">利息</th>
+                        <th className="px-4 py-2 text-center">开始日期</th>
+                        <th className="px-4 py-2 text-center">截止日期</th>
+                        <th className="px-4 py-2 text-center">状态</th>
+                        <th className="px-4 py-2 text-center">实还金额</th>
+                        <th className="px-4 py-2 text-center">还款时间</th>
+                        <th className="px-4 py-2 text-center">操作</th>
+                        {batchMode && (
+                          <th className="px-4 py-2 text-center">生成链接</th>
+                        )}
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {schedules.length > 0 ? (
+                        schedules.map((s: any) => (
+                          <tr key={s.id} className="border-t hover:bg-gray-50">
+                            <td className="px-4 py-2 text-center font-medium">
+                              {s.period}
+                            </td>
+                            <td className="px-4 py-2 text-center font-semibold text-gray-900">
+                              ¥{s.due_amount}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              ¥{s.capital}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              ¥{s.interest}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {new Date(s.due_start_date).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {new Date(s.due_end_date).toLocaleDateString()}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs ${
+                                  s.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : s.status === "active"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : s.status === "paid"
+                                    ? "bg-green-100 text-green-800"
+                                    : s.status === "overdue"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-800"
+                                }`}
+                              >
+                                {s.status === "pending"
+                                  ? "待还款"
+                                  : s.status === "active"
+                                  ? "进行中"
+                                  : s.status === "paid"
+                                  ? "已还款"
+                                  : s.status === "overdue"
+                                  ? "逾期"
+                                  : s.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {s.paid_amount ? `¥${s.paid_amount}` : "-"}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              {s.paid_at
+                                ? new Date(s.paid_at).toLocaleDateString()
+                                : "-"}
+                            </td>
+                            <td className="px-4 py-2 text-center">
+                              <button
+                                onClick={() => handleEditSchedule(s)}
+                                className="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
+                              >
+                                编辑
+                              </button>
+                            </td>
+                            {batchMode && (
+                              <td className="px-4 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedSchedules.has(s.id)}
+                                  onChange={() => handleScheduleSelect(s.id)}
+                                  className="rounded"
+                                />
+                              </td>
+                            )}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={batchMode ? 11 : 10}
+                            className="px-4 py-8 text-center text-gray-500"
+                          >
+                            暂无还款计划
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

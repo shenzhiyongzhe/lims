@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { get, post, put } from "@/lib/http";
 
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "";
+
 interface QRCodeData {
   id: number;
   qrcode_url: string;
@@ -34,7 +36,7 @@ export default function QRCodeManagementPage() {
   const fetchQRCodes = async () => {
     setLoading(true);
     try {
-      const res = await get("/api/payee/qrcode");
+      const res = await get("/payees/qrcode");
       setQrCodes(res.data || []);
     } catch (error: any) {
       setMessage(error.message || "获取二维码列表失败");
@@ -72,27 +74,24 @@ export default function QRCodeManagementPage() {
     setMessage("");
 
     try {
-      // 先上传文件
+      // 创建FormData并上传文件
       const formData = new FormData();
       formData.append("file", form.file);
       formData.append("qrcode_type", form.qrcode_type);
 
-      const uploadRes = await fetch("/api/payee/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      const uploadResult = await uploadRes.json();
-
-      if (!uploadRes.ok) {
-        throw new Error(uploadResult.message || "上传失败");
-      }
-
-      // 创建二维码记录
-      const createRes = await post("/api/payee/qrcode", {
+      console.log("Sending FormData:", {
+        hasFile: !!form.file,
+        fileName: form.file?.name,
+        fileType: form.file?.type,
+        fileSize: form.file?.size,
         qrcode_type: form.qrcode_type,
-        qrcode_url: uploadResult.url,
       });
+
+      const response = await post("/payees/upload", formData, { json: false });
+
+      if (response.code !== 200) {
+        throw new Error(response.message || "上传失败");
+      }
 
       setMessage("上传成功");
       setForm({ qrcode_type: "wechat_pay", file: null });
@@ -112,7 +111,7 @@ export default function QRCodeManagementPage() {
     currentActive: boolean
   ) => {
     try {
-      await put(`/api/payee/qrcode/${qrcodeId}`, {
+      await put(`/payee/qrcode/${qrcodeId}`, {
         active: !currentActive,
       });
 
@@ -128,7 +127,7 @@ export default function QRCodeManagementPage() {
     if (!confirm("确定要删除这个二维码吗？")) return;
 
     try {
-      await fetch(`/api/payee/qrcode/${qrcodeId}`, { method: "DELETE" });
+      await fetch(`/payee/qrcode/${qrcodeId}`, { method: "DELETE" });
       setMessage("删除成功");
       fetchQRCodes();
     } catch (error: any) {
@@ -159,6 +158,14 @@ export default function QRCodeManagementPage() {
   // 格式化日期
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString("zh-CN");
+  };
+
+  // 构建完整的图片URL
+  const getFullImageUrl = (url: string) => {
+    if (url.startsWith("http")) {
+      return url; // 已经是完整URL
+    }
+    return `${BASE_URL}${url}`;
   };
 
   return (
@@ -227,11 +234,14 @@ export default function QRCodeManagementPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
-                          src={qrCode.qrcode_url}
+                          src={getFullImageUrl(qrCode.qrcode_url)}
                           alt="二维码"
                           className="h-16 w-16 object-cover rounded border cursor-pointer hover:scale-105 transition-transform"
                           onClick={() =>
-                            window.open(qrCode.qrcode_url, "_blank")
+                            window.open(
+                              getFullImageUrl(qrCode.qrcode_url),
+                              "_blank"
+                            )
                           }
                         />
                         <div className="ml-3">

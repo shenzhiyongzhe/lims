@@ -1,5 +1,6 @@
 "use client";
 
+import { get, post } from "@/lib/http";
 import { useEffect, useState } from "react";
 
 type Customer = {
@@ -38,15 +39,12 @@ export default function CustomersPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(
-        `/api/customers/management?page=${p}&pageSize=${ps}`
-      );
-      const json: Resp = await res.json();
-      if (!res.ok) throw new Error((json as any)?.message || "加载失败");
-      setRows(Array.isArray(json.data) ? json.data : []);
-      setPage(json.pagination?.page || p);
-      setPageSize(json.pagination?.pageSize || ps);
-      setTotal(json.pagination?.total || 0);
+      const res = await get(`/users?page=${p}&pageSize=${ps}`);
+      if (res.code != 200) throw new Error(res?.message || "加载失败");
+      setRows(Array.isArray(res.data.data) ? res.data.data : []);
+      setPage(res.data.pagination?.page || p);
+      setPageSize(res.data.pagination?.pageSize || ps);
+      setTotal(res.data.pagination?.total || 0);
     } catch (e: any) {
       setError(e.message || "加载失败");
     } finally {
@@ -76,6 +74,27 @@ export default function CustomersPage() {
     fetchData(p, pageSize);
   };
 
+  const addNew = async () => {
+    setAdding(true);
+    setError("");
+    try {
+      const res = await post("/users", addForm);
+      if (res.code != 200) throw new Error(res.message || "添加失败");
+      setShowAdd(false);
+      setAddForm({
+        username: "",
+        phone: "",
+        address: "",
+        lv: "青铜用户",
+      });
+      alert(res.message);
+      fetchData(1, pageSize);
+    } catch (e: any) {
+      setError(e.message || "添加失败");
+    } finally {
+      setAdding(false);
+    }
+  };
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-end justify-between">
@@ -315,31 +334,7 @@ export default function CustomersPage() {
                 <button
                   className="px-3 py-2 text-sm bg-blue-600 text-white rounded shadow-sm hover:bg-blue-700 disabled:opacity-50"
                   disabled={adding}
-                  onClick={async () => {
-                    setAdding(true);
-                    setError("");
-                    try {
-                      const res = await fetch("/api/customers/management", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(addForm),
-                      });
-                      const json = await res.json();
-                      if (!res.ok) throw new Error(json?.message || "创建失败");
-                      setShowAdd(false);
-                      setAddForm({
-                        username: "",
-                        phone: "",
-                        address: "",
-                        lv: "青铜用户",
-                      });
-                      fetchData(1, pageSize);
-                    } catch (e: any) {
-                      setError(e.message || "创建失败");
-                    } finally {
-                      setAdding(false);
-                    }
-                  }}
+                  onClick={addNew}
                 >
                   {adding ? "创建中..." : "确定创建"}
                 </button>

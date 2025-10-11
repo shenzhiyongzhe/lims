@@ -7,7 +7,7 @@ export default function DashboardHome() {
       <p className="text-gray-600">请选择左侧菜单进入对应功能。</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-gray-600">
         <Link
-          href="/page/admin-users-management"
+          href="/page/admin/management"
           className="p-4 bg-white rounded-lg border hover:shadow-sm"
         >
           后台用户管理

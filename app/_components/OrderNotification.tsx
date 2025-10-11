@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSSE } from "@/app/_hooks/useSSE";
+import { post } from "@/lib/http";
 
 interface OrderData {
   id: string;
@@ -33,7 +34,7 @@ export default function OrderNotification({
 
   // SSE连接 - 自动连接，因为收款人需要实时接收订单
   const { isConnected } = useSSE({
-    url: `/api/events?type=payee`,
+    url: `/events?type=payee`,
     autoConnect: true, // 收款人需要自动连接
     onMessage: (message) => {
       if (message.type === "new_order") {
@@ -52,21 +53,28 @@ export default function OrderNotification({
     setIsGrabbing(true);
 
     try {
-      const response = await fetch("/api/events", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // 从localStorage获取admin信息
+      const adminData = localStorage.getItem("admin");
+      if (!adminData) {
+        setGrabResult({ success: false, message: "未找到管理员信息" });
+        return;
+      }
+
+      const admin = JSON.parse(adminData);
+      if (!admin.id) {
+        setGrabResult({ success: false, message: "管理员信息无效" });
+        return;
+      }
+
+      const result = await post("/events", {
+        type: "grab_order",
+        data: {
+          id: currentOrder.id,
+          admin_id: admin.id,
         },
-        body: JSON.stringify({
-          type: "grab_order",
-          data: {
-            id: currentOrder.id,
-          },
-        }),
       });
 
-      const result = await response.json();
-      setGrabResult(result);
+      setGrabResult(result.data);
 
       if (result.success) {
         setCurrentOrder(null);

@@ -46,7 +46,7 @@ export default function FeedbackPage() {
       if (st) query.set("status", st);
       query.set("page", String(p));
       query.set("pageSize", String(ps));
-      const res = await fetch(`/api/feedback?${query.toString()}`);
+      const res = await fetch(`/feedback?${query.toString()}`);
       const json: Resp = await res.json();
       if (!res.ok) throw new Error((json as any)?.message || "加载失败");
       setRows(Array.isArray(json.data) ? json.data : []);
@@ -167,7 +167,7 @@ export default function FeedbackPage() {
                         className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
                         onClick={async () => {
                           try {
-                            const res = await fetch("/api/feedback", {
+                            const res = await fetch("/feedback", {
                               method: "PUT",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
@@ -336,7 +336,7 @@ export default function FeedbackPage() {
                     setAdding(true);
                     setError("");
                     try {
-                      const res = await fetch("/api/feedback", {
+                      const res = await fetch("/feedback", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify(form),

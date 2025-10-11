@@ -55,7 +55,7 @@ export default function MyCustomersPage() {
   });
 
   useEffect(() => {
-    fetch("/api/customers/my")
+    fetch("/customers/my")
       .then((res) => res.json())
       .then((res) => {
         setData(res.data || []);

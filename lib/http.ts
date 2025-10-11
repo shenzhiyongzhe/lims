@@ -57,7 +57,9 @@ async function coreFetch<T>(
         try {
           const admin = JSON.parse(adminData);
           return {
-            Authorization: `Bearer ${btoa(JSON.stringify(admin))}`,
+            Authorization: `Bearer ${Buffer.from(
+              JSON.stringify(admin)
+            ).toString("base64")}`,
           };
         } catch (e) {
           console.error("Failed to parse admin data:", e);
@@ -79,6 +81,11 @@ async function coreFetch<T>(
     credentials: "include", // 确保发送 cookie
     signal: controller.signal,
   };
+
+  // 对于 FormData，不要设置 Content-Type，让浏览器自动设置
+  if (body instanceof FormData) {
+    delete (init.headers as any)["Content-Type"];
+  }
 
   if (method !== "GET" && body !== undefined) {
     init.body = json ? JSON.stringify(body) : body;

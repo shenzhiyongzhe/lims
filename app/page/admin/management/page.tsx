@@ -1,6 +1,6 @@
 "use client";
 
-import { post, get } from "@/lib/http";
+import { post, get, put } from "@/lib/http";
 import { useEffect, useMemo, useState } from "react";
 
 type Role = "管理员" | "财务员" | "风控人" | "负责人" | "收款人" | "打款人";
@@ -41,7 +41,7 @@ export default function AdminUsersPage() {
 
   const saveEdit = async () => {
     try {
-      await post("/api/admin-management", form);
+      await put("/admins", form);
       setUsers((prev) =>
         prev.map((u) => (u.id === editingId ? { ...form, id: u.id } : u))
       );
@@ -58,7 +58,13 @@ export default function AdminUsersPage() {
   const addNew = async () => {
     if (!form.username || !form.password) return;
     try {
-      const res = await post("/api/admin-management", form);
+      const filteredForm = {
+        username: form.username,
+        password: form.password,
+        phone: form.phone,
+        role: form.role,
+      };
+      const res = await post("/admins", filteredForm);
       await getAllAdminUsers();
       cancelEdit();
       alert(res.message);
@@ -68,7 +74,7 @@ export default function AdminUsersPage() {
   };
   const getAllAdminUsers = async () => {
     try {
-      const res = await get("/api/admin-management");
+      const res = await get("/admins");
       if (res && Array.isArray(res.data)) {
         setUsers(res.data);
       } else {
