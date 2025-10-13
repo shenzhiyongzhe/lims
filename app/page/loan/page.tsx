@@ -1,12 +1,13 @@
 "use client";
 import { get, post } from "@/lib/http";
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { translateStatus } from "@/lib/constants";
 
 export default function LoanSchedulePage() {
-  const params = useParams();
   const router = useRouter();
-  const loanId = params.loan_id as string;
+  const searchParams = useSearchParams();
+  const loanId = searchParams.get("loan_id");
 
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -28,6 +29,11 @@ export default function LoanSchedulePage() {
   const [batchGenerating, setBatchGenerating] = useState(false);
 
   async function fetchSchedules() {
+    if (!loanId) {
+      console.error("缺少 loan_id 参数");
+      return;
+    }
+
     setScheduleLoading(true);
     try {
       const res = await get(`/loan-accounts/${loanId}`);
@@ -151,6 +157,26 @@ export default function LoanSchedulePage() {
       fetchSchedules();
     }
   }, [loanId]);
+
+  // 如果没有 loan_id 参数，显示错误信息
+  if (!loanId) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">参数错误</h1>
+            <p className="text-gray-600 mb-6">缺少必要的 loan_id 参数</p>
+            <button
+              onClick={() => router.push("/page/loan/list")}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              返回贷款列表
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -314,15 +340,7 @@ export default function LoanSchedulePage() {
                         : "bg-gray-100 text-gray-800"
                     }`}
                   >
-                    {loanInfo.status === "pending"
-                      ? "待放款"
-                      : loanInfo.status === "active"
-                      ? "进行中"
-                      : loanInfo.status === "completed"
-                      ? "已完成"
-                      : loanInfo.status === "overdue"
-                      ? "逾期"
-                      : loanInfo.status}
+                    {translateStatus(loanInfo.status)}
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -488,15 +506,7 @@ export default function LoanSchedulePage() {
                                     : "bg-gray-100 text-gray-800"
                                 }`}
                               >
-                                {s.status === "pending"
-                                  ? "待还款"
-                                  : s.status === "active"
-                                  ? "进行中"
-                                  : s.status === "paid"
-                                  ? "已还款"
-                                  : s.status === "overdue"
-                                  ? "逾期"
-                                  : s.status}
+                                {translateStatus(s.status)}
                               </span>
                             </td>
                             <td className="px-4 py-2 text-center">

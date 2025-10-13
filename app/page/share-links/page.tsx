@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useSSE } from "@/app/_hooks/useSSE";
 import { get, post } from "@/lib/http";
 
@@ -15,8 +15,8 @@ const colorMap: { [key: string]: string } = {
 };
 
 export default function ShareRepaymentPage() {
-  const params = useParams();
-  const token = params.token as string;
+  const searchParams = useSearchParams();
+  const token = searchParams.get("token");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
   const [summary, setSummary] = useState<any>(null);

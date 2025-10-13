@@ -1,6 +1,6 @@
 "use client";
 
-import { post, get, put } from "@/lib/http";
+import { post, get, put, del } from "@/lib/http";
 import { useEffect, useMemo, useState } from "react";
 
 type Role = "管理员" | "财务员" | "风控人" | "负责人" | "收款人" | "打款人";
@@ -51,8 +51,14 @@ export default function AdminUsersPage() {
     }
   };
 
-  const remove = (id: number) => {
-    setUsers((prev) => prev.filter((u) => u.id !== id));
+  const remove = async (id: number) => {
+    try {
+      const res = await del(`/admins/${id}`);
+      if (res.code != 200) throw new Error(res?.message || "删除失败");
+      await getAllAdminUsers();
+    } catch (error) {
+      alert(error);
+    }
   };
 
   const addNew = async () => {

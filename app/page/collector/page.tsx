@@ -57,10 +57,9 @@ export default function StatsPage() {
       const url = `/stats/collector${
         collector ? `?collector=${encodeURIComponent(collector)}` : ""
       }`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || "加载失败");
-      setStats(json.data || { daily: [], monthly: [], yearly: [] });
+      const res = await get(url);
+      if (res.code !== 200) throw new Error(res?.message || "加载失败");
+      setStats(res.data || { daily: [], monthly: [], yearly: [] });
     } catch (e: any) {
       setError(e.message || "加载失败");
     } finally {
@@ -74,10 +73,9 @@ export default function StatsPage() {
       const url = `/stats/overdue${
         collector ? `?collector=${encodeURIComponent(collector)}` : ""
       }`;
-      const res = await fetch(url);
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.message || "加载失败");
-      setOverdue(json.data || null);
+      const res = await get(url);
+      if (res.code !== 200) throw new Error(res?.message || "加载失败");
+      setOverdue(res.data || null);
     } catch (e: any) {
       setOverdueError(e.message || "加载失败");
     }
@@ -90,7 +88,7 @@ export default function StatsPage() {
         collector ? `?collector=${encodeURIComponent(collector)}` : ""
       }`;
       const res = await get(url);
-      if (!res.ok) throw new Error(res?.message || "加载失败");
+      if (res.code !== 200) throw new Error(res?.message || "加载失败");
       setRiskUsers(Array.isArray(res.data) ? res.data : []);
     } catch (e: any) {
       setRiskError(e.message || "加载失败");

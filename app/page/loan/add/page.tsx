@@ -13,6 +13,7 @@ type LoanPlanForm = {
   loan_amount: number;
   capital: number;
   interest: number;
+  to_hand_ratio: number;
   due_start_date: string;
   due_end_date: string; // 日期
   handling_fee: number; // 金额
@@ -31,6 +32,7 @@ export default function AddLoanPlanPage() {
     loan_amount: 0,
     capital: 0,
     interest: 0,
+    to_hand_ratio: 0,
     due_start_date: "",
     due_end_date: "",
     handling_fee: 0, // 金额
@@ -169,7 +171,7 @@ export default function AddLoanPlanPage() {
         form
       );
       setMessage(res.message);
-      router.push(`/page/loan/${res.data.id}`);
+      router.push(`/page/loan?loan_id=${res.data.id}`);
     } catch (error: any) {
       setMessage(error.message);
     }
@@ -214,6 +216,22 @@ export default function AddLoanPlanPage() {
             />
           </div>
           <div>
+            <label className="block text-sm text-gray-600 mb-1">到手成数</label>
+            <input
+              type="number"
+              value={form.to_hand_ratio || ""}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  to_hand_ratio: Number(e.target.value) || 0,
+                }))
+              }
+              required
+              className="input-base-w"
+              placeholder="请输入到手成数"
+            />
+          </div>
+          <div>
             <label className="block text-sm text-gray-600 mb-1">本金</label>
             <input
               type="number"
@@ -242,16 +260,20 @@ export default function AddLoanPlanPage() {
           </div>
           <div>
             <label className="block text-sm text-gray-600 mb-1">
-              开始还款日期
+              每期还款金额
             </label>
             <input
-              type="date"
-              value={form.due_start_date}
+              type="number"
+              value={form.daily_repayment || ""}
               onChange={(e) =>
-                setForm((f) => ({ ...f, due_start_date: e.target.value }))
+                setForm((f) => ({
+                  ...f,
+                  daily_repayment: Number(e.target.value) || 0,
+                }))
               }
               required
               className="input-base-w"
+              placeholder="请输入每期还款金额"
             />
           </div>
           <div>
@@ -271,6 +293,21 @@ export default function AddLoanPlanPage() {
             />
           </div>
           <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              开始还款日期
+            </label>
+            <input
+              type="date"
+              value={form.due_start_date}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, due_start_date: e.target.value }))
+              }
+              required
+              className="input-base-w"
+            />
+          </div>
+
+          <div>
             <label className="block text-sm text-gray-300 mb-1">
               结束还款日期
             </label>
@@ -285,24 +322,6 @@ export default function AddLoanPlanPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-600 mb-1">
-              每期还款金额
-            </label>
-            <input
-              type="number"
-              value={form.daily_repayment || ""}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  daily_repayment: Number(e.target.value) || 0,
-                }))
-              }
-              required
-              className="input-base-w"
-              placeholder="请输入每期还款金额"
-            />
-          </div>
           <SearchableSelect
             label="风控人"
             value={riskControllerSelect.selectedValue}

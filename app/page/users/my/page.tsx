@@ -166,7 +166,7 @@ export default function MyCustomersPage() {
                             <span
                               className="text-blue-400"
                               onClick={() =>
-                                router.push(`/page/loan/${account.id}`)
+                                router.push(`/page/loan?loan_id=${account.id}`)
                               }
                             >
                               <span className="text-gray-500">贷款ID：</span>
