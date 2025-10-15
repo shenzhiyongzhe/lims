@@ -2,7 +2,7 @@
 import { get, post } from "@/lib/http";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { translateStatus } from "@/lib/constants";
+import { getStatusColor, translateStatus } from "@/lib/constants";
 
 export default function LoanSchedulePage() {
   const router = useRouter();
@@ -20,13 +20,10 @@ export default function LoanSchedulePage() {
     due_end_date: "",
     status: "",
   });
-
-  // 批量选择生成链接
-  const [batchMode, setBatchMode] = useState(false);
-  const [selectedSchedules, setSelectedSchedules] = useState<Set<number>>(
-    new Set()
-  );
-  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [copyToast, setCopyToast] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   async function fetchSchedules() {
     if (!loanId) {
@@ -54,74 +51,30 @@ export default function LoanSchedulePage() {
   }
 
   // 新增批量操作相关函数
-  const handleBatchModeToggle = () => {
-    setBatchMode(!batchMode);
-    setSelectedSchedules(new Set());
-  };
-
-  const handleScheduleSelect = (scheduleId: number) => {
-    const newSelected = new Set(selectedSchedules);
-    if (newSelected.has(scheduleId)) {
-      newSelected.delete(scheduleId);
-    } else {
-      newSelected.add(scheduleId);
-    }
-    setSelectedSchedules(newSelected);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedSchedules.size === schedules.length) {
-      setSelectedSchedules(new Set());
-    } else {
-      setSelectedSchedules(new Set(schedules.map((s: any) => s.id)));
-    }
-  };
-
-  const handleBatchGenerate = async () => {
-    if (selectedSchedules.size === 0) {
-      alert("请选择要生成链接的还款计划");
-      return;
-    }
-
-    setBatchGenerating(true);
-
+  const generateShareLink = async () => {
+    if (!loanId) return;
+    const url = `${window.location.origin}/page/share-links?loan_id=${loanId}`;
     try {
-      const ids = Array.from(selectedSchedules);
-      const share_res = await post("/share-links", { ids });
-
-      if (share_res.data.shareUrl) {
-        try {
-          await navigator.clipboard.writeText(share_res.data.shareUrl);
-          alert(
-            `已生成 ${selectedSchedules.size} 期还款计划的分享链接并复制到剪贴板`
-          );
-        } catch (error) {
-          // 降级方案
-          const textArea = document.createElement("textarea");
-          textArea.value = share_res.data.shareUrl;
-          document.body.appendChild(textArea);
-          textArea.select();
-          document.execCommand("copy");
-          document.body.removeChild(textArea);
-          alert(
-            `已生成 ${selectedSchedules.size} 期还款计划的分享链接并复制到剪贴板`
-          );
-        }
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (!ok) throw new Error("复制失败");
       }
-      // 重置选择状态
-      setSelectedSchedules(new Set());
-      setBatchMode(false);
-    } catch (error) {
-      console.error("生成分享链接失败:", error);
-      alert("生成分享链接失败");
+      setCopyToast({ type: "success", text: "链接已复制到剪贴板" });
+    } catch (e: any) {
+      setCopyToast({ type: "error", text: e?.message || "复制失败" });
     } finally {
-      setBatchGenerating(false);
+      setTimeout(() => setCopyToast(null), 2000);
     }
-  };
-
-  const handleBatchCancel = () => {
-    setSelectedSchedules(new Set());
-    setBatchMode(false);
   };
 
   // 添加处理函数
@@ -181,6 +134,15 @@ export default function LoanSchedulePage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {copyToast && (
+          <div
+            className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow-md text-white ${
+              copyToast.type === "success" ? "bg-green-600" : "bg-red-600"
+            }`}
+          >
+            {copyToast.text}
+          </div>
+        )}
         {/* 页面头部 */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
@@ -404,50 +366,13 @@ export default function LoanSchedulePage() {
                     还款计划
                   </h2>
                   <div className="flex items-center gap-4">
-                    {!batchMode ? (
-                      <button
-                        onClick={handleBatchModeToggle}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                      >
-                        生成链接
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={handleSelectAll}
-                          className="px-3 py-1 text-blue-600 hover:bg-blue-50 rounded text-sm"
-                        >
-                          {selectedSchedules.size === schedules.length
-                            ? "取消全选"
-                            : "全选"}
-                        </button>
-                        <span className="text-sm text-gray-600">
-                          已选择 {selectedSchedules.size} 项
-                        </span>
-                      </div>
-                    )}
+                    <button
+                      onClick={generateShareLink}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      生成链接
+                    </button>
                   </div>
-
-                  {batchMode && (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleBatchCancel}
-                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 text-sm"
-                        disabled={batchGenerating}
-                      >
-                        取消
-                      </button>
-                      <button
-                        onClick={handleBatchGenerate}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
-                        disabled={
-                          batchGenerating || selectedSchedules.size === 0
-                        }
-                      >
-                        {batchGenerating ? "生成中..." : "确定生成"}
-                      </button>
-                    </div>
-                  )}
                 </div>
 
                 {/* 表格 */}
@@ -465,9 +390,6 @@ export default function LoanSchedulePage() {
                         <th className="px-4 py-2 text-center">实还金额</th>
                         <th className="px-4 py-2 text-center">还款时间</th>
                         <th className="px-4 py-2 text-center">操作</th>
-                        {batchMode && (
-                          <th className="px-4 py-2 text-center">生成链接</th>
-                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -494,17 +416,9 @@ export default function LoanSchedulePage() {
                             </td>
                             <td className="px-4 py-2 text-center">
                               <span
-                                className={`px-2 py-1 rounded-full text-xs ${
-                                  s.status === "pending"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : s.status === "active"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : s.status === "paid"
-                                    ? "bg-green-100 text-green-800"
-                                    : s.status === "overdue"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-gray-100 text-gray-800"
-                                }`}
+                                className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
+                                  s.status
+                                )}`}
                               >
                                 {translateStatus(s.status)}
                               </span>
@@ -525,24 +439,11 @@ export default function LoanSchedulePage() {
                                 编辑
                               </button>
                             </td>
-                            {batchMode && (
-                              <td className="px-4 py-2 text-center">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedSchedules.has(s.id)}
-                                  onChange={() => handleScheduleSelect(s.id)}
-                                  className="rounded"
-                                />
-                              </td>
-                            )}
                           </tr>
                         ))
                       ) : (
                         <tr>
-                          <td
-                            colSpan={batchMode ? 11 : 10}
-                            className="px-4 py-8 text-center text-gray-500"
-                          >
+                          <td className="px-4 py-8 text-center text-gray-500">
                             暂无还款计划
                           </td>
                         </tr>

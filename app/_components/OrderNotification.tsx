@@ -29,7 +29,7 @@ export default function OrderNotification({
   const [isGrabbing, setIsGrabbing] = useState(false);
   const [grabResult, setGrabResult] = useState<{
     success: boolean;
-    message: string;
+    message?: string;
   } | null>(null);
 
   // SSE连接 - 自动连接，因为收款人需要实时接收订单
@@ -74,11 +74,11 @@ export default function OrderNotification({
         },
       });
 
-      setGrabResult(result.data);
+      setGrabResult(result.data.message);
 
-      if (result.success) {
+      if (result.code == 200) {
         setCurrentOrder(null);
-        onOrderGrabbed(result.id);
+        onOrderGrabbed(result.data.id);
       }
     } catch (error) {
       setGrabResult({ success: false, message: "抢单失败" });

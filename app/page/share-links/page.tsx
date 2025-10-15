@@ -6,20 +6,13 @@ import { useSSE } from "@/app/_hooks/useSSE";
 import { get, post } from "@/lib/http";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
-const colorMap: { [key: string]: string } = {
-  pending: "bg-yellow-100 text-yellow-800",
-  active: "bg-blue-100 text-blue-800",
-  paid: "bg-green-100 text-green-800",
-  overtime: "bg-orange-100 text-orange-800",
-  overdue: "bg-red-100 text-red-800",
-};
 
 export default function ShareRepaymentPage() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const loanId = searchParams.get("loan_id");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>("");
-  const [summary, setSummary] = useState<any>(null);
+  const [loanInfo, setLoanInfo] = useState<any>(null);
 
   const [orderStatus, setOrderStatus] = useState<
     "pending" | "grabbed" | "failed"
@@ -91,20 +84,17 @@ export default function ShareRepaymentPage() {
 
     // 发送订单到SSE服务
     const orderData = {
-      id: `${token}`,
-      share_id: token,
       customer_id: form.user_id,
       customer: {
-        username: summary.user.username,
-        phone: summary.user.phone,
-        address: summary.user.address,
+        username: loanInfo.user.username,
+        phone: loanInfo.user.phone,
+        address: loanInfo.user.address,
       },
       amount: form.amount,
       payment_method: form.payment_method,
       remark: form.remark,
       loan_id: form.loan_id,
       payment_periods: form.payment_periods,
-      expires_at: summary.expires_at,
     };
 
     try {
@@ -183,21 +173,20 @@ export default function ShareRepaymentPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await get(`/share-links/${token}`);
+        if (!loanId) {
+          throw new Error("缺少 loan_id 参数");
+        }
+        const response = await get(`/loan-accounts/${loanId}`);
         if (response.code != 200) {
           throw new Error(response.message || "获取数据失败");
         }
-        setSummary(response.data.summary);
+        setLoanInfo(response.data);
         setForm((prev: any) => ({
           ...prev,
-          user_id: response.data.summary.user.id,
-          loan_id: response.data.summary.loan_id,
-          payment_periods: response.data.summary.count,
+          user_id: response.data.user.id,
+          loan_id: response.data.id,
+          payment_periods: 1,
         }));
-        console.log(
-          "result.summary.user.user_id",
-          response.data.summary.user.id
-        );
       } catch (error: any) {
         setError(error.message);
       } finally {
@@ -205,19 +194,17 @@ export default function ShareRepaymentPage() {
       }
     };
 
-    if (token) {
-      fetchData();
-    }
-  }, [token]);
+    fetchData();
+  }, [loanId]);
 
-  // 倒计时：根据 summary.due_end_date 与当前时间差显示
+  // 倒计时：根据 loanInfo.due_end_date 与当前时间差显示
   useEffect(() => {
-    if (!summary?.due_end_date) return;
+    if (!loanInfo?.due_end_date) return;
     const parseDue = () => {
       // 兼容字符串日期
-      const due = new Date(summary.due_end_date);
+      const due = new Date(loanInfo.due_end_date);
       return isNaN(due.getTime())
-        ? new Date(`${summary.due_end_date}T00:00:00+08:00`)
+        ? new Date(`${loanInfo.due_end_date}T00:00:00+08:00`)
         : due;
     };
 
@@ -247,7 +234,7 @@ export default function ShareRepaymentPage() {
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [summary?.due_end_date]);
+  }, [loanInfo?.due_end_date]);
 
   // 组件卸载时断开SSE连接并清除定时器
   useEffect(() => {
@@ -285,7 +272,7 @@ export default function ShareRepaymentPage() {
     );
   }
 
-  if (!summary) {
+  if (!loanInfo) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -303,30 +290,15 @@ export default function ShareRepaymentPage() {
     return `¥${parseFloat(amount).toLocaleString()}`;
   };
 
-  const getStatusText = (status: string) => {
-    const statusMap: { [key: string]: string } = {
-      pending: "待还款",
-      active: "进行中",
-      paid: "已还清",
-      overtime: "超时",
-      overdue: "逾期",
-    };
-    return statusMap[status] || status;
-  };
-
-  const getStatusColor = (status: string) => {
-    return colorMap[status] || "bg-gray-100 text-gray-800";
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="grid grid-cols-1  gap-4">
             <div className="flex  items-center justify-between">
-              <div>3</div>
+              <div>{loanInfo.repaid_periods}</div>
               <div className="bg-yellow-400 text-white px-2 py-1 rounded-md">
-                尊敬的{summary.user.lv}
+                尊敬的{loanInfo.user.lv}
               </div>
             </div>
             <div className="flex items-center justify-center">
@@ -345,7 +317,7 @@ export default function ShareRepaymentPage() {
                   className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-1000 ease-out relative"
                   style={{
                     width: `${(
-                      (summary.repaid_periods / summary.total_periods) *
+                      (loanInfo.repaid_periods / loanInfo.total_periods) *
                       100
                     ).toFixed(1)}%`,
                   }}
@@ -357,7 +329,7 @@ export default function ShareRepaymentPage() {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-xs font-bold text-white drop-shadow-sm">
                     {(
-                      (summary.repaid_periods / summary.total_periods) *
+                      (loanInfo.repaid_periods / loanInfo.total_periods) *
                       100
                     ).toFixed(1)}
                     %
@@ -367,9 +339,9 @@ export default function ShareRepaymentPage() {
               <div className="flex justify-between text-xs text-gray-500 mt-1">
                 <span>
                   已还:
-                  {summary.repaid_periods}
+                  {loanInfo.repaid_periods}
                 </span>
-                <span>总期数: {summary.total_periods}</span>
+                <span>总期数: {loanInfo.total_periods}</span>
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -397,7 +369,12 @@ export default function ShareRepaymentPage() {
                   <span className="text-sm text-gray-700">支付宝</span>
                 </label>
                 <span className="inline-flex items-center bg-yellow-500 text-white px-2 py-1 rounded-md text-sm">
-                  {summary.count}期
+                  {Math.max(
+                    (loanInfo.total_periods || 0) -
+                      (loanInfo.repaid_periods || 0),
+                    0
+                  )}
+                  期
                 </span>
               </div>
               <div className="flex gap-2 justify-between">
@@ -503,7 +480,7 @@ export default function ShareRepaymentPage() {
                       <span className="font-bold text-lg text-blue-600">
                         {form.amount
                           ? `¥${parseFloat(form.amount).toLocaleString()}`
-                          : formatAmount(summary.payable_amount)}
+                          : formatAmount(loanInfo.daily_repayment || "0")}
                       </span>
                     </div>
                     {form.remark && (

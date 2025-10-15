@@ -65,7 +65,7 @@ export const TRANSLATIONS = {
     paid: { zh: "已还清", en: "paid" },
     overtime: { zh: "超时", en: "overtime" },
     overdue: { zh: "逾期", en: "overdue" },
-  } as Record<RepaymentStatus, Record<Locale, string>>,
+  } as Record<RepaymentStatus | LoanAccountStatus, Record<Locale, string>>,
   paymentMethod: {
     wechat_pay: { zh: "微信支付", en: "WeChat Pay" },
     ali_pay: { zh: "支付宝", en: "Alipay" },
@@ -80,8 +80,15 @@ export const TRANSLATIONS = {
   } as Record<(typeof ROLES)[number], Record<Locale, string>>,
 } as const;
 
-export function translateStatus(value: RepaymentStatus, locale: Locale = "zh") {
-  return TRANSLATIONS.status[value]?.[locale] ?? value;
+export function translateStatus(
+  value: RepaymentStatus | LoanAccountStatus,
+  locale: Locale = "zh"
+) {
+  return (
+    TRANSLATIONS.status[value as RepaymentStatus | LoanAccountStatus]?.[
+      locale
+    ] ?? value
+  );
 }
 
 export function translatePaymentMethod(
@@ -97,3 +104,32 @@ export function translateRole(
 ) {
   return TRANSLATIONS.role[value]?.[locale] ?? value;
 }
+
+const colorMap: { [key: string]: string } = {
+  pending: "bg-yellow-100 text-yellow-800",
+  active: "bg-blue-100 text-blue-800",
+  paid: "bg-green-100 text-green-800",
+  overtime: "bg-orange-100 text-orange-800",
+  overdue: "bg-red-100 text-red-800",
+  settled: "bg-green-100 text-green-800",
+  unsettled: "bg-yellow-100 text-yellow-800",
+  negotiated: "bg-blue-100 text-blue-800",
+  to_be_processed: "bg-orange-100 text-orange-800",
+  blacklist: "bg-red-100 text-red-800",
+};
+
+export const getStatusColor = (status: string) => {
+  return colorMap[status] || "bg-gray-100 text-gray-800";
+};
+
+export const LoanAccountStatus = [
+  "pending",
+  "active",
+  "overdue",
+  "settled",
+  "unsettled",
+  "negotiated",
+  "to_be_processed",
+  "blacklist",
+];
+export type LoanAccountStatus = (typeof LoanAccountStatus)[number];

@@ -45,7 +45,7 @@ export default function AdminLogin() {
 
   const checkLogin = async () => {
     try {
-      const res = await get("/admins/verify");
+      const res = await get("/auth/verify");
       if (res.valid) {
         localStorage.setItem("admin", JSON.stringify(res.data));
         router.push(`/page/${roleZhToEn(res.data.role)}`);

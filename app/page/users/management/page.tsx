@@ -63,9 +63,23 @@ export default function CustomersPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await get(`/users?page=${p}&pageSize=${ps}`);
+      const res = await get(
+        `/loan-account-roles/users?page=${p}&pageSize=${ps}`
+      );
       if (res.code != 200) throw new Error(res?.message || "加载失败");
-      setRows(Array.isArray(res.data.data) ? res.data.data : []);
+
+      const users = Array.isArray(res.data.data) ? res.data.data : [];
+
+      // 将每个用户的贷款数据存储到 userLoans 中
+      const loansMap: { [userId: number]: any[] } = {};
+      users.forEach((user: any) => {
+        if (user.loan_accounts && Array.isArray(user.loan_accounts)) {
+          loansMap[user.id] = user.loan_accounts;
+        }
+      });
+
+      setRows(users);
+      setUserLoans(loansMap);
       setPage(res.data.pagination?.page || p);
       setPageSize(res.data.pagination?.pageSize || ps);
       setTotal(res.data.pagination?.total || 0);
@@ -76,32 +90,14 @@ export default function CustomersPage() {
     }
   };
 
-  const fetchUserLoans = async (userId: number) => {
-    // 如果已经展开，则收起
+  const toggleUserLoans = (userId: number) => {
+    // 如果已经展开，则收起；否则展开（如果有数据的话）
     if (expandedUser === userId) {
       setExpandedUser(null);
-      return;
-    }
-
-    // 如果已经有数据，直接展开
-    if (userLoans[userId]) {
+    } else if (userLoans[userId]) {
       setExpandedUser(userId);
-      return;
     }
-
-    // 加载数据
-    setLoadingLoans((prev) => ({ ...prev, [userId]: true }));
-    try {
-      const res = await get(`/loan-accounts/user/${userId}`);
-      if (res.code !== 200) throw new Error(res?.message || "加载失败");
-
-      setUserLoans((prev) => ({ ...prev, [userId]: res.data || [] }));
-      setExpandedUser(userId);
-    } catch (e: any) {
-      setError(e.message || "加载贷款信息失败");
-    } finally {
-      setLoadingLoans((prev) => ({ ...prev, [userId]: false }));
-    }
+    // 如果没有数据，也不发送请求，直接保持收起状态
   };
 
   useEffect(() => {
@@ -349,7 +345,7 @@ export default function CustomersPage() {
                     <td className="px-4 py-2 text-right">{u.overdue_time}</td>
                     <td className="px-4 py-2 text-right">
                       <button
-                        onClick={() => fetchUserLoans(u.id)}
+                        onClick={() => toggleUserLoans(u.id)}
                         className="flex items-center gap-1 text-blue-600 hover:bg-blue-50 rounded px-2 py-1"
                         disabled={loadingLoans[u.id]}
                       >

@@ -3,7 +3,11 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { get } from "@/lib/http";
-import { translateStatus } from "@/lib/constants";
+import {
+  LoanAccountStatus,
+  getStatusColor,
+  translateStatus,
+} from "@/lib/constants";
 
 type LoanAccount = {
   id: number;
@@ -15,7 +19,7 @@ type LoanAccount = {
   interest: string | null;
   due_start_date: string;
   due_end_date: string;
-  status: "pending" | "active" | "paid" | "overtime" | "overdue";
+  status: LoanAccountStatus;
   handling_fee: string;
   total_periods: number;
   repaid_periods: number;
@@ -54,7 +58,7 @@ type GroupedLoanData = {
   loanAccounts: LoanAccount[];
 };
 
-const STATUSES = ["pending", "active", "paid", "overtime", "overdue"] as const;
+const STATUSES = LoanAccountStatus;
 
 function InnerScheduleListPage() {
   const [rows, setRows] = useState<GroupedLoanData[]>([]);
@@ -65,8 +69,7 @@ function InnerScheduleListPage() {
   const [error, setError] = useState("");
   const router = useRouter();
   const search = useSearchParams();
-  const urlStatus = (search.get("status") ||
-    "pending") as LoanAccount["status"];
+  const urlStatus = (search.get("status") || "pending") as LoanAccountStatus;
   const [status, setStatus] = useState<LoanAccount["status"]>(
     (STATUSES as readonly string[]).includes(urlStatus) ? urlStatus : "pending"
   );
@@ -74,7 +77,9 @@ function InnerScheduleListPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await get(`/loan-accounts/grouped-by-user`);
+      const res = await get(
+        `/loan-accounts/grouped-by-user?page=${p}&pageSize=${ps}&status=${st}`
+      );
       if (res.code != 200) throw new Error(res?.message || "加载失败");
       setRows(Array.isArray(res.data) ? res.data : []);
       setPage(res.data.pagination?.page || p);
@@ -113,17 +118,17 @@ function InnerScheduleListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-gray-900">还款计划列表</h2>
-        {/* <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">状态</label>
           <select
             className="border rounded px-2 py-1 text-sm"
             value={status}
             onChange={(e) => {
-              const next = e.target.value as LoanAccount["status"];
+              const next = e.target.value as LoanAccountStatus;
               setPage(1);
               setStatus(next);
               router.replace(
-                `/page/loan/status=${encodeURIComponent(
+                `/page/loan/list?status=${encodeURIComponent(
                   next
                 )}&page=1&pageSize=${pageSize}`
               );
@@ -143,7 +148,7 @@ function InnerScheduleListPage() {
           >
             {loading ? "刷新中..." : "刷新"}
           </button>
-        </div> */}
+        </div>
       </div>
 
       {error && (
@@ -292,17 +297,9 @@ function InnerScheduleListPage() {
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          loan.status === "pending"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : loan.status === "active"
-                            ? "bg-blue-100 text-blue-800"
-                            : loan.status === "paid"
-                            ? "bg-green-100 text-green-800"
-                            : loan.status === "overdue"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
+                        className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
+                          loan.status
+                        )}`}
                       >
                         {translateStatus(loan.status)}
                       </span>

@@ -33,8 +33,7 @@ export default function PayeeOrdersPage() {
         id,
         status: "completed",
       });
-      const json = await res.data;
-      if (json.data) {
+      if (res.code == 200) {
         setOrders((prev) =>
           prev.map((o) => (o.id === id ? { ...o, status: "completed" } : o))
         );

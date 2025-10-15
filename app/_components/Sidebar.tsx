@@ -14,12 +14,17 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/page/admin/management", label: "管理员用户管理", icon: "🏠" },
-  { href: "/page/users/management", label: "贷款用户管理", icon: "🏠" },
+  {
+    href: "/page/users/management",
+    label: "贷款用户管理",
+    icon: "🏠",
+    roles: ["收款人", "负责人", "风控人"],
+  },
   {
     href: "/page/loan/list",
     label: "贷款列表",
     icon: "🏠",
-    roles: ["收款人", "负责人"],
+    roles: ["收款人", "负责人", "风控人"],
   },
   {
     href: "/page/loan/add",

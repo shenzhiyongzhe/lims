@@ -1,12 +1,59 @@
 "use client";
-import { ReactNode, Suspense } from "react";
-import { usePathname } from "next/navigation";
+import { ReactNode, Suspense, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Sidebar from "../_components/Sidebar";
 
 function DashboardContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const hideSidebarRoutes = ["/page/login", "/page/shared"]; // 需要隐藏侧边栏的路由
+  const router = useRouter();
+  const hideSidebarRoutes = ["/page/login", "/page/share-links"]; // 需要隐藏侧边栏的路由
   const hideSidebar = hideSidebarRoutes.includes(pathname);
+
+  // 客户端路由守卫（适配 static export，无需 middleware）
+  useEffect(() => {
+    // 分享链接页始终公开访问
+    if (pathname.startsWith("/page/share-links")) {
+      return;
+    }
+
+    // 公共（无需登录）路由白名单
+    const publicPrefixes = [
+      "/page/login",
+      "/page/share-links",
+      "/page/feedback",
+    ];
+
+    // 需要登录的路由前缀（根据你的实际业务自行增减）
+    const protectedPrefixes = [
+      "/page/admin",
+      "/page/users",
+      "/page/collector",
+      "/page/payee",
+      "/page/risk_controller",
+      "/page/loan",
+    ];
+
+    const isPublic = publicPrefixes.some((p) => pathname.startsWith(p));
+    const isProtected = protectedPrefixes.some((p) => pathname.startsWith(p));
+
+    if (!isProtected || isPublic) return;
+
+    try {
+      const admin =
+        typeof window !== "undefined" && localStorage.getItem("admin");
+      const user =
+        typeof window !== "undefined" && localStorage.getItem("user");
+      if (!admin && !user) {
+        const search =
+          typeof window !== "undefined" ? window.location.search : "";
+        const redirect = encodeURIComponent(`${pathname}${search}`);
+        router.replace(`/page/login?redirect=${redirect}`);
+      }
+    } catch {
+      // 读取本地存储异常时，兜底跳转登录
+      router.replace("/page/login");
+    }
+  }, [pathname, router]);
 
   if (hideSidebar) {
     return (
