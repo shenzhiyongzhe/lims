@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { useSSE } from "@/app/_hooks/useSSE";
+import { useWebSocket, WebSocketMessage } from "@/app/_hooks/useWebSocket";
 import { get, post } from "@/lib/http";
+import ChatBubble from "@/app/_components/ChatBubble";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
@@ -47,10 +48,21 @@ export default function ShareRepaymentPage() {
     return `${BASE_URL}${url}`;
   };
 
-  // SSE连接 - 不自动连接，手动控制
-  const { isConnected, connect, disconnect } = useSSE({
-    autoConnect: false, // 不自动连接
-    onMessage: (message) => {
+  // WebSocket连接 - 不自动连接，手动控制
+  const { isConnected, connect, disconnect, connectionError } = useWebSocket({
+    connections: [
+      {
+        id: "customer-orders",
+        type: "events" as const,
+        url: "/events",
+        queryParams: {
+          type: "customer",
+          user_id: form.user_id.toString(),
+        },
+      },
+    ],
+    onOrderMessage: (message) => {
+      console.log("Received order WebSocket message:", message);
       if (message.type === "order_grabbed") {
         // 清除超时定时器
         if (timeoutRef.current) {
@@ -64,6 +76,7 @@ export default function ShareRepaymentPage() {
         fetchQrcode(message.data.payeeId);
       }
     },
+    autoConnect: false,
   });
 
   const handleSubmit = async () => {
@@ -75,11 +88,10 @@ export default function ShareRepaymentPage() {
     setHaveSubmit(true);
     setOrderStatus("pending");
 
-    // 在提交订单时连接SSE
+    // 在提交订单时连接WebSocket
     if (!isConnected) {
       console.log("form.user_id", form.user_id);
-      const sseUrl = `/events?type=customer&user_id=${form.user_id}`;
-      connect(sseUrl);
+      connect();
     }
 
     // 发送订单到SSE服务
@@ -414,6 +426,15 @@ export default function ShareRepaymentPage() {
                   <p className="text-sm text-gray-500 mt-1">
                     连接状态: {isConnected ? "已连接" : "连接中..."}
                   </p>
+                  {Object.values(connectionError).some((error) => error) && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {
+                        Object.values(connectionError).filter(
+                          (error) => error
+                        )[0]
+                      }
+                    </p>
+                  )}
                 </div>
               )}
               {orderStatus === "grabbed" && grabbedPayee && (
@@ -523,6 +544,11 @@ export default function ShareRepaymentPage() {
           </div>
         )}
       </div>
+
+      {/* 悬浮聊天气泡 */}
+      {loanId && form.user_id > 0 && (
+        <ChatBubble loanId={loanId} userId={form.user_id} userType="user" />
+      )}
     </div>
   );
 }

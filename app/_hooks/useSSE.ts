@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { get } from "@/lib/http";
+import { io, Socket } from "socket.io-client";
 
 // 使用NestJS后端地址，端口3000
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
@@ -29,25 +29,44 @@ export function useSSE({
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<SSEMessage | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   const connect = async (connectUrl?: string) => {
     const targetUrl = connectUrl || url;
     if (!targetUrl) {
-      console.warn("No URL provided for SSE connection");
-      setConnectionError("No URL provided for SSE connection");
+      console.warn("No URL provided for Socket.IO connection");
+      setConnectionError("No URL provided for Socket.IO connection");
       return;
     }
 
     // 如果已经连接，先断开
-    if (eventSourceRef.current) {
+    if (socketRef.current) {
       disconnect();
     }
 
-    // 从localStorage获取admin信息并添加到URL参数
-    let finalUrl = targetUrl;
+    // 从localStorage获取admin信息并构建查询参数
+    let queryParams: Record<string, string> = {};
 
-    if (targetUrl.includes("type=payee")) {
+    // 解析URL中的查询参数
+    let urlType = "customer";
+    let urlParams: Record<string, string> = {};
+
+    // 解析URL中的查询参数
+    if (targetUrl.includes("?")) {
+      const urlObj = new URL(
+        targetUrl.startsWith("http") ? targetUrl : `${BASE_URL}${targetUrl}`
+      );
+      urlObj.searchParams.forEach((value, key) => {
+        urlParams[key] = value;
+      });
+      if (urlParams.type) {
+        urlType = urlParams.type;
+      }
+    }
+
+    queryParams.type = urlType;
+
+    if (urlType === "payee") {
       try {
         // 从localStorage获取admin信息
         const adminData = localStorage.getItem("admin");
@@ -62,97 +81,99 @@ export function useSSE({
           return;
         }
 
-        // 将admin.id添加到URL参数
-        const urlObj = new URL(
-          targetUrl.startsWith("http") ? targetUrl : `${BASE_URL}${targetUrl}`
-        );
-        urlObj.searchParams.set("admin_id", admin.id.toString());
-        finalUrl = urlObj.toString();
-
+        queryParams.admin_id = admin.id.toString();
         console.log("Admin ID from localStorage:", admin.id);
       } catch (error) {
         console.error("Error parsing admin data:", error);
         setConnectionError("Failed to parse admin data from localStorage");
         return;
       }
+    } else if (urlType === "customer") {
+      // 对于customer类型，从URL参数中获取user_id
+      if (urlParams.user_id) {
+        queryParams.user_id = urlParams.user_id;
+        console.log("User ID from URL:", urlParams.user_id);
+      } else {
+        console.warn("No user_id found in URL for customer connection");
+      }
     }
 
-    // 构建完整的 SSE URL
-    const fullUrl = finalUrl.startsWith("http")
-      ? finalUrl
-      : `${BASE_URL}${finalUrl}`;
+    // 构建Socket.IO服务器URL
+    const serverUrl = BASE_URL;
 
-    console.log("SSE connection details:", {
+    console.log("Socket.IO connection details:", {
       targetUrl,
-      baseUrl: BASE_URL,
-      fullUrl,
-      readyState: eventSourceRef.current?.readyState,
+      serverUrl,
+      queryParams,
     });
 
-    // 测试NestJS服务器连接
-    console.log("Testing NestJS server connection...");
-    console.log("BASE_URL:", BASE_URL);
-    console.log("Full URL:", fullUrl);
+    // 测试Socket.IO服务器连接
+    console.log("Testing Socket.IO server connection...");
+    console.log("Server URL:", serverUrl);
+    console.log("Query params:", queryParams);
     console.log("Admin data from localStorage:", localStorage.getItem("admin"));
 
     // 清除之前的错误
     setConnectionError(null);
 
     try {
-      console.log("Creating EventSource for:", fullUrl);
-      eventSourceRef.current = new EventSource(fullUrl);
+      console.log("Creating Socket.IO connection for:", serverUrl);
+      socketRef.current = io(serverUrl, {
+        query: queryParams,
+        transports: ["websocket", "polling"],
+        autoConnect: false,
+      });
 
-      eventSourceRef.current.onopen = () => {
-        console.log("SSE connected successfully:", {
-          url: fullUrl,
-          readyState: eventSourceRef.current?.readyState,
+      socketRef.current.on("connect", () => {
+        console.log("Socket.IO connected successfully:", {
+          id: socketRef.current?.id,
+          connected: socketRef.current?.connected,
         });
         setIsConnected(true);
         onOpen?.();
-      };
+      });
 
-      eventSourceRef.current.onmessage = (event) => {
-        try {
-          const message: SSEMessage = JSON.parse(event.data);
-          setLastMessage(message);
-          onMessage?.(message);
-        } catch (error) {
-          console.error("Failed to parse SSE message:", error);
-        }
-      };
+      socketRef.current.on("message", (data: SSEMessage) => {
+        console.log("Received Socket.IO message:", data);
+        setLastMessage(data);
+        onMessage?.(data);
+      });
 
-      eventSourceRef.current.onerror = (error) => {
-        const errorMessage = `SSE connection failed: ${eventSourceRef.current?.url} (readyState: ${eventSourceRef.current?.readyState})`;
-        console.error("SSE connection error details:", {
+      socketRef.current.on("connected", (data: SSEMessage) => {
+        console.log("Socket.IO connected event:", data);
+      });
+
+      socketRef.current.on("disconnect", (reason) => {
+        console.log("Socket.IO connection disconnected:", reason);
+        setIsConnected(false);
+        onClose?.();
+      });
+
+      socketRef.current.on("connect_error", (error) => {
+        const errorMessage = `Socket.IO connection failed: ${error.message}`;
+        console.error("Socket.IO connection error details:", {
           error,
-          readyState: eventSourceRef.current?.readyState,
-          url: eventSourceRef.current?.url,
-          type: error.type,
-          target: error.target,
-          timeStamp: error.timeStamp,
           errorMessage,
         });
         setConnectionError(errorMessage);
         setIsConnected(false);
-        onError?.(error);
-      };
-
-      eventSourceRef.current.addEventListener("close", () => {
-        setIsConnected(false);
-        onClose?.();
+        onError?.(error as any);
       });
+
+      // 手动连接
+      socketRef.current.connect();
     } catch (error) {
-      const errorMessage = `Failed to create SSE connection: ${error}`;
-      console.error("Failed to create SSE connection:", error);
+      const errorMessage = `Failed to create Socket.IO connection: ${error}`;
+      console.error("Failed to create Socket.IO connection:", error);
       setConnectionError(errorMessage);
     }
   };
 
   const disconnect = () => {
-    if (eventSourceRef.current) {
-      console.log("Disconnecting SSE:", eventSourceRef.current.url);
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (socketRef.current) {
+      console.log("Disconnecting Socket.IO:", socketRef.current.id);
+      socketRef.current.disconnect();
+      socketRef.current = null;
     }
     setIsConnected(false);
   };
@@ -160,7 +181,7 @@ export function useSSE({
   useEffect(() => {
     if (autoConnect && url) {
       connect().catch((error) => {
-        console.error("Failed to connect to SSE:", error);
+        console.error("Failed to connect to Socket.IO:", error);
         setConnectionError(`Failed to connect: ${error.message}`);
       });
     }

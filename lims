@@ -47,7 +47,7 @@ server {
     }
 
     # 后端 API 反向代理（仅匹配接口前缀）
-    location ~ ^/(admins|auth|statistics|events|orders|users|loan-accounts|repayment-schedules|payees|payee)(/|$) {
+    location ~ ^/(admins|auth|statistics|events|orders|users|loan-accounts|loan-account-roles|repayment-schedules|payees|payee)(/|$) {
         # 允许跨域预检在此快速返回
         if ($request_method = OPTIONS) {
             add_header Access-Control-Allow-Origin $http_origin always;

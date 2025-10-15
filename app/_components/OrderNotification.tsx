@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSSE } from "@/app/_hooks/useSSE";
+import { useWebSocket, WebSocketMessage } from "@/app/_hooks/useWebSocket";
 import { post } from "@/lib/http";
 
 interface OrderData {
@@ -32,19 +32,43 @@ export default function OrderNotification({
     message?: string;
   } | null>(null);
 
-  // SSE连接 - 自动连接，因为收款人需要实时接收订单
-  const { isConnected } = useSSE({
-    url: `/events?type=payee`,
-    autoConnect: true, // 收款人需要自动连接
-    onMessage: (message) => {
+  // WebSocket连接 - 自动连接，因为收款人需要实时接收订单
+  const { isConnected, connectionError } = useWebSocket({
+    connections: [
+      {
+        id: "payee-orders",
+        type: "events" as const,
+        url: "/events",
+        queryParams: (() => {
+          try {
+            const adminData = localStorage.getItem("admin");
+            if (adminData) {
+              const admin = JSON.parse(adminData);
+              if (admin.id) {
+                return {
+                  type: "payee",
+                  admin_id: admin.id.toString(),
+                } as Record<string, string>;
+              }
+            }
+          } catch (error) {
+            console.error("Error parsing admin data:", error);
+          }
+          return { type: "payee" } as Record<string, string>;
+        })(),
+      },
+    ],
+    onOrderMessage: (message) => {
+      console.log("Received order WebSocket message:", message);
       if (message.type === "new_order") {
         setCurrentOrder(message.data);
         setGrabResult(null);
         console.log("new_order", message.data);
       } else if (message.type === "connected") {
-        console.log("SSE connected:", message.data);
+        console.log("Order WebSocket connected:", message.data);
       }
     },
+    autoConnect: true,
   });
 
   const handleGrabOrder = async () => {
@@ -66,6 +90,7 @@ export default function OrderNotification({
         return;
       }
 
+      // 使用POST请求抢单（与后端WebSocket网关配合使用）
       const result = await post("/events", {
         type: "grab_order",
         data: {
@@ -74,7 +99,7 @@ export default function OrderNotification({
         },
       });
 
-      setGrabResult(result.data.message);
+      setGrabResult(result.data);
 
       if (result.code == 200) {
         setCurrentOrder(null);
@@ -179,6 +204,11 @@ export default function OrderNotification({
 
         <div className="mt-2 text-xs text-gray-500 text-center">
           连接状态: {isConnected ? "已连接" : "连接中..."}
+          {Object.values(connectionError).some((error) => error) && (
+            <div className="text-red-500 text-xs mt-1">
+              {Object.values(connectionError).filter((error) => error)[0]}
+            </div>
+          )}
         </div>
       </div>
     </div>
