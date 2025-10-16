@@ -13,10 +13,21 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/page/admin/management", label: "管理员用户管理", icon: "🏠" },
+  {
+    href: "/page/admin/management",
+    label: "后台用户",
+    icon: "🏠",
+    roles: ["管理员"],
+  },
   {
     href: "/page/users/management",
-    label: "贷款用户管理",
+    label: "客户管理",
+    icon: "🏠",
+    roles: ["收款人", "负责人", "风控人"],
+  },
+  {
+    href: "/page/users/list",
+    label: "客户列表",
     icon: "🏠",
     roles: ["收款人", "负责人", "风控人"],
   },
@@ -60,6 +71,11 @@ const NAV_ITEMS: NavItem[] = [
     label: "添加收款码",
     icon: "🏠",
     roles: ["收款人"],
+  },
+  {
+    href: "/page/admin/chat",
+    label: "聊天室",
+    icon: "🏠",
   },
   {
     href: "/page/feedback",

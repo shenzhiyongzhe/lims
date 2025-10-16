@@ -91,7 +91,7 @@ export function useWebSocket({
 
       try {
         console.log(`Creating ${type} WebSocket connection for:`, url);
-        const socketUrl = type === "events" ? BASE_URL : `${BASE_URL}/${type}`;
+        const socketUrl = url ? `${BASE_URL}/${url}` : BASE_URL;
 
         socketRefs.current[id] = io(socketUrl, {
           query: queryParams,
@@ -173,9 +173,11 @@ export function useWebSocket({
   // 连接所有WebSocket
   const connect = useCallback(async () => {
     for (const connection of connections) {
-      await connectSocket(connection);
+      if (!isConnected[connection.id]) {
+        await connectSocket(connection);
+      }
     }
-  }, [connections, connectSocket]);
+  }, [connections, connectSocket, isConnected]);
 
   // 断开所有连接
   const disconnect = useCallback(() => {
@@ -215,14 +217,18 @@ export function useWebSocket({
 
   // 自动连接
   useEffect(() => {
-    if (autoConnect && connections.length > 0) {
+    if (
+      autoConnect &&
+      connections.length > 0 &&
+      Object.keys(isConnected).length === 0
+    ) {
       connect();
     }
 
     return () => {
       disconnect();
     };
-  }, [autoConnect, connections, connect, disconnect]);
+  }, [autoConnect, connections, connect, disconnect, isConnected]);
 
   return {
     // 状态

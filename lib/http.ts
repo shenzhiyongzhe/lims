@@ -1,5 +1,5 @@
 // lib/http.ts
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
 export type ApiResponse<T = unknown> = {
   code?: number;
