@@ -11,7 +11,7 @@ export interface WebSocketMessage {
 
 export interface WebSocketConnection {
   id: string;
-  type: "events" | "chat";
+  type: "events";
   url: string;
   queryParams: Record<string, string>;
 }
@@ -20,7 +20,6 @@ interface UseWebSocketOptions {
   connections?: WebSocketConnection[];
   onMessage?: (message: WebSocketMessage, connectionType: string) => void;
   onOrderMessage?: (message: WebSocketMessage) => void; // 订单相关消息
-  onChatMessage?: (message: WebSocketMessage) => void; // 聊天相关消息
   onOpen?: (connectionType: string) => void;
   onClose?: (connectionType: string) => void;
   onError?: (error: Event, connectionType: string) => void;
@@ -31,7 +30,6 @@ export function useWebSocket({
   connections = [],
   onMessage,
   onOrderMessage,
-  onChatMessage,
   onOpen,
   onClose,
   onError,
@@ -44,6 +42,26 @@ export function useWebSocket({
   >({});
   const [unreadCount, setUnreadCount] = useState(0);
   const socketRefs = useRef<Record<string, Socket>>({});
+  const connectionAttempts = useRef<Record<string, number>>({});
+  const connectionTimeouts = useRef<Record<string, NodeJS.Timeout>>({});
+
+  // 使用 ref 存储回调函数，避免依赖项问题
+  const callbacksRef = useRef({
+    onMessage,
+    onOrderMessage,
+    onOpen,
+    onClose,
+    onError,
+  });
+
+  // 更新回调函数引用
+  callbacksRef.current = {
+    onMessage,
+    onOrderMessage,
+    onOpen,
+    onClose,
+    onError,
+  };
 
   // 处理消息路由
   const handleMessage = useCallback(
@@ -51,33 +69,14 @@ export function useWebSocket({
       setLastMessage(message);
 
       // 调用通用消息处理器
-      onMessage?.(message, connectionType);
+      callbacksRef.current.onMessage?.(message, connectionType);
 
       // 根据消息类型调用特定处理器
       if (connectionType === "events") {
-        onOrderMessage?.(message);
-      } else if (connectionType === "chat") {
-        onChatMessage?.(message);
-
-        // 如果是聊天消息且不是当前用户发送的，增加未读计数
-        if (message.type !== "connected" && message.data?.sender_id) {
-          // 这里需要从localStorage或其他地方获取当前用户ID来判断
-          const currentUserId =
-            localStorage.getItem("admin") || localStorage.getItem("user");
-          if (currentUserId) {
-            try {
-              const user = JSON.parse(currentUserId);
-              if (message.data.sender_id !== user.id) {
-                setUnreadCount((prev) => prev + 1);
-              }
-            } catch (e) {
-              console.warn("Failed to parse user data for unread count");
-            }
-          }
-        }
+        callbacksRef.current.onOrderMessage?.(message);
       }
     },
-    [onMessage, onOrderMessage, onChatMessage]
+    []
   );
 
   // 连接单个WebSocket
@@ -85,18 +84,36 @@ export function useWebSocket({
     async (connection: WebSocketConnection) => {
       const { id, type, url, queryParams } = connection;
 
+      // 检查连接尝试次数，避免频繁重试
+      const attempts = connectionAttempts.current[id] || 0;
+      if (attempts > 3) {
+        console.warn(`Too many connection attempts for ${id}, skipping`);
+        return;
+      }
+
+      // 清除之前的超时
+      if (connectionTimeouts.current[id]) {
+        clearTimeout(connectionTimeouts.current[id]);
+        delete connectionTimeouts.current[id];
+      }
+
       if (socketRefs.current[id]) {
         socketRefs.current[id].disconnect();
+        delete socketRefs.current[id];
       }
 
       try {
-        console.log(`Creating ${type} WebSocket connection for:`, url);
+        console.log(`Creating ${type} WebSocket connection for:`, url, {
+          attempt: attempts + 1,
+          queryParams,
+        });
         const socketUrl = url ? `${BASE_URL}/${url}` : BASE_URL;
 
         socketRefs.current[id] = io(socketUrl, {
           query: queryParams,
           transports: ["websocket", "polling"],
           autoConnect: false,
+          timeout: 10000, // 10秒超时
         });
 
         const socket = socketRefs.current[id];
@@ -105,13 +122,17 @@ export function useWebSocket({
           console.log(`${type} WebSocket connected successfully:`, socket.id);
           setIsConnected((prev) => ({ ...prev, [id]: true }));
           setConnectionError((prev) => ({ ...prev, [id]: "" }));
-          onOpen?.(type);
+          // 重置连接尝试次数
+          connectionAttempts.current[id] = 0;
+
+          callbacksRef.current.onOpen?.(type);
         });
 
         socket.on("disconnect", (reason) => {
           console.log(`${type} WebSocket disconnected:`, reason);
           setIsConnected((prev) => ({ ...prev, [id]: false }));
-          onClose?.(type);
+
+          callbacksRef.current.onClose?.(type);
         });
 
         socket.on("connect_error", (error) => {
@@ -119,7 +140,18 @@ export function useWebSocket({
           console.error(`${type} WebSocket connection error:`, error);
           setConnectionError((prev) => ({ ...prev, [id]: errorMessage }));
           setIsConnected((prev) => ({ ...prev, [id]: false }));
-          onError?.(error as any, type);
+
+          // 增加连接尝试次数
+          connectionAttempts.current[id] =
+            (connectionAttempts.current[id] || 0) + 1;
+
+          // 设置重试超时
+          connectionTimeouts.current[id] = setTimeout(() => {
+            console.log(`Retrying connection for ${id}...`);
+            connectSocket(connection);
+          }, 5000); // 5秒后重试
+
+          callbacksRef.current.onError?.(error as any, type);
         });
 
         // 为不同类型的连接设置不同的消息处理器
@@ -136,51 +168,58 @@ export function useWebSocket({
           socket.on("order_grabbed", (data: WebSocketMessage) => {
             handleMessage(data, "events");
           });
-        } else if (type === "chat") {
-          socket.on("message", (data: WebSocketMessage) => {
-            handleMessage(data, "chat");
-          });
-          socket.on("connected", (data: WebSocketMessage) => {
-            handleMessage(data, "chat");
-          });
-          socket.on("chat_session_joined", (data: WebSocketMessage) => {
-            handleMessage(data, "chat");
-          });
-          socket.on("new_message", (data: WebSocketMessage) => {
-            handleMessage(data, "chat");
-          });
-          socket.on("messages_read", (data: WebSocketMessage) => {
-            handleMessage(data, "chat");
-          });
-          socket.on("unread_count", (data: WebSocketMessage) => {
-            if (data.data?.unread_count !== undefined) {
-              setUnreadCount(data.data.unread_count);
-            }
-            handleMessage(data, "chat");
-          });
-        }
 
-        socket.connect();
+          socket.connect();
+        }
       } catch (error) {
         const errorMessage = `Failed to create ${type} WebSocket connection: ${error}`;
         console.error(errorMessage, error);
         setConnectionError((prev) => ({ ...prev, [id]: errorMessage }));
       }
     },
-    [handleMessage, onOpen, onClose, onError]
+    [handleMessage]
   );
-
   // 连接所有WebSocket
   const connect = useCallback(async () => {
+    console.log("Attempting to connect WebSockets...", {
+      connections: connections.length,
+      isConnected,
+      socketRefs: Object.keys(socketRefs.current),
+    });
+
     for (const connection of connections) {
-      if (!isConnected[connection.id]) {
+      const isAlreadyConnected = isConnected[connection.id];
+      const hasSocketRef = !!socketRefs.current[connection.id];
+
+      console.log(`Connection ${connection.id}:`, {
+        isAlreadyConnected,
+        hasSocketRef,
+        shouldConnect: !isAlreadyConnected && !hasSocketRef,
+      });
+
+      if (!isAlreadyConnected && !hasSocketRef) {
+        console.log(`Connecting to ${connection.id}...`);
         await connectSocket(connection);
+      } else {
+        console.log(
+          `Skipping ${connection.id} - already connected or has socket ref`
+        );
       }
     }
   }, [connections, connectSocket, isConnected]);
 
   // 断开所有连接
   const disconnect = useCallback(() => {
+    // 清理所有超时
+    Object.values(connectionTimeouts.current).forEach((timeout) => {
+      clearTimeout(timeout);
+    });
+    connectionTimeouts.current = {};
+
+    // 重置连接尝试次数
+    connectionAttempts.current = {};
+
+    // 断开所有socket连接
     Object.values(socketRefs.current).forEach((socket) => {
       if (socket) {
         socket.disconnect();
@@ -217,18 +256,22 @@ export function useWebSocket({
 
   // 自动连接
   useEffect(() => {
-    if (
-      autoConnect &&
-      connections.length > 0 &&
-      Object.keys(isConnected).length === 0
-    ) {
-      connect();
+    if (autoConnect && connections.length > 0) {
+      // 检查是否已经有连接，避免重复连接
+      const hasActiveConnections = connections.some(
+        (conn) => isConnected[conn.id] || socketRefs.current[conn.id]
+      );
+
+      if (!hasActiveConnections) {
+        console.log("Auto-connecting WebSocket...");
+        connect();
+      }
     }
 
     return () => {
       disconnect();
     };
-  }, [autoConnect, connections, connect, disconnect, isConnected]);
+  }, [autoConnect, connections.length]); // 只依赖长度，避免重复连接
 
   return {
     // 状态
@@ -246,7 +289,5 @@ export function useWebSocket({
     // 便捷方法
     connectEvents: () =>
       connectSocket(connections.find((c) => c.type === "events")!),
-    connectChat: () =>
-      connectSocket(connections.find((c) => c.type === "chat")!),
   };
 }

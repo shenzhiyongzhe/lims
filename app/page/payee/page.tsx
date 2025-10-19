@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import OrderNotification from "@/app/_components/OrderNotification";
-import ChatBubble from "@/app/_components/ChatBubble";
 import { get, put } from "@/lib/http";
 
 export default function PayeeOrdersPage() {
@@ -162,15 +161,6 @@ export default function PayeeOrdersPage() {
 
       {/* 订单通知组件 */}
       <OrderNotification onOrderGrabbed={handleOrderGrabbed} />
-
-      {/* 悬浮聊天气泡 */}
-      {currentAdmin && (
-        <ChatBubble
-          loanId="" // 收款人页面不需要特定loan_id
-          userId={currentAdmin.id}
-          userType="admin"
-        />
-      )}
     </div>
   );
 }

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useWebSocket, WebSocketMessage } from "@/app/_hooks/useWebSocket";
 import { get, post } from "@/lib/http";
-import ChatBubble from "@/app/_components/ChatBubble";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
@@ -544,11 +543,6 @@ export default function ShareRepaymentPage() {
           </div>
         )}
       </div>
-
-      {/* 悬浮聊天气泡 */}
-      {loanId && form.user_id > 0 && (
-        <ChatBubble loanId={loanId} userId={form.user_id} userType="user" />
-      )}
     </div>
   );
 }

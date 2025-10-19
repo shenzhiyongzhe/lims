@@ -73,11 +73,6 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["收款人"],
   },
   {
-    href: "/page/admin/chat",
-    label: "聊天室",
-    icon: "🏠",
-  },
-  {
     href: "/page/feedback",
     label: "反馈管理",
     icon: "🏠",
