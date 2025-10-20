@@ -41,7 +41,8 @@ export default function AdminUsersPage() {
 
   const saveEdit = async () => {
     try {
-      await put("/admins", form);
+      const { id, ...rest } = form;
+      await put(`/admins/${editingId}`, rest);
       setUsers((prev) =>
         prev.map((u) => (u.id === editingId ? { ...form, id: u.id } : u))
       );

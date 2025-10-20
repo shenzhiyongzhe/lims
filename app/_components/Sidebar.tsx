@@ -20,6 +20,12 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["管理员"],
   },
   {
+    href: "/page/admin/visitors",
+    label: "访客统计",
+    icon: "📊",
+    roles: ["管理员"],
+  },
+  {
     href: "/page/users/management",
     label: "客户管理",
     icon: "🏠",

@@ -11,7 +11,7 @@ export interface WebSocketMessage {
 
 export interface WebSocketConnection {
   id: string;
-  type: "events";
+  type: "events" | "payee";
   url: string;
   queryParams: Record<string, string>;
 }
@@ -72,7 +72,7 @@ export function useWebSocket({
       callbacksRef.current.onMessage?.(message, connectionType);
 
       // 根据消息类型调用特定处理器
-      if (connectionType === "events") {
+      if (connectionType === "events" || connectionType === "payee") {
         callbacksRef.current.onOrderMessage?.(message);
       }
     },
@@ -157,16 +157,16 @@ export function useWebSocket({
         // 为不同类型的连接设置不同的消息处理器
         if (type === "events") {
           socket.on("message", (data: WebSocketMessage) => {
-            handleMessage(data, "events");
+            handleMessage(data, type);
           });
           socket.on("connected", (data: WebSocketMessage) => {
-            handleMessage(data, "events");
+            handleMessage(data, type);
           });
           socket.on("new_order", (data: WebSocketMessage) => {
-            handleMessage(data, "events");
+            handleMessage(data, type);
           });
           socket.on("order_grabbed", (data: WebSocketMessage) => {
-            handleMessage(data, "events");
+            handleMessage(data, type);
           });
 
           socket.connect();
@@ -288,6 +288,8 @@ export function useWebSocket({
 
     // 便捷方法
     connectEvents: () =>
-      connectSocket(connections.find((c) => c.type === "events")!),
+      connectSocket(
+        connections.find((c) => c.type === "events" || c.type === "payee")!
+      ),
   };
 }

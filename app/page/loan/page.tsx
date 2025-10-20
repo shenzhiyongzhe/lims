@@ -53,7 +53,7 @@ export default function LoanSchedulePage() {
   // 新增批量操作相关函数
   const generateShareLink = async () => {
     if (!loanId) return;
-    const url = `${window.location.origin}/page/share-links?loan_id=${loanId}`;
+    const url = `${window.location.origin}/page/customers?loan_id=${loanId}`;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(url);

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useWebSocket, WebSocketMessage } from "@/app/_hooks/useWebSocket";
 import { get, post } from "@/lib/http";
+import { logVisit } from "@/lib/visitors";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:3000";
 
@@ -27,6 +28,19 @@ export default function ShareRepaymentPage() {
     amount: 0,
     remark: "",
   });
+
+  const [toast, setToast] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
+  const handleAmountClick = () => {
+    setToast({
+      type: "info",
+      text: `当前金额: ¥${form.amount || "0"}`,
+    });
+    // 2秒后自动隐藏toast
+    setTimeout(() => setToast(null), 2000);
+  };
   const [haveSubmit, setHaveSubmit] = useState(false);
 
   const [qrcodeLoading, setQrcodeLoading] = useState(false);
@@ -109,6 +123,18 @@ export default function ShareRepaymentPage() {
     };
 
     try {
+      // Log visitor activity for order submission
+      try {
+        await logVisit({
+          visitor_type: "user",
+          visitor_id: form.user_id,
+          action_type: "submit_order",
+          page_url: window.location.pathname,
+        });
+      } catch (error) {
+        console.error("Failed to log visitor activity:", error);
+      }
+
       const response = await post("/events", {
         type: "submit_order",
         data: orderData,
@@ -208,6 +234,26 @@ export default function ShareRepaymentPage() {
     fetchData();
   }, [loanId]);
 
+  // Log page view when component mounts and user_id is available
+  useEffect(() => {
+    const logPageView = async () => {
+      if (form.user_id && form.user_id > 0) {
+        try {
+          await logVisit({
+            visitor_type: "user",
+            visitor_id: form.user_id,
+            action_type: "page_view",
+            page_url: window.location.pathname,
+          });
+        } catch (error) {
+          console.error("Failed to log page view:", error);
+        }
+      }
+    };
+
+    logPageView();
+  }, [form.user_id]);
+
   // 倒计时：根据 loanInfo.due_end_date 与当前时间差显示
   useEffect(() => {
     if (!loanInfo?.due_end_date) return;
@@ -236,9 +282,9 @@ export default function ShareRepaymentPage() {
       const due = parseDue();
       const diff = due.getTime() - now.getTime();
       if (diff >= 0) {
-        setCountdown({ text: `剩余 ${fmt(diff)}`, overtime: false });
+        setCountdown({ text: `${fmt(diff)}`, overtime: false });
       } else {
-        setCountdown({ text: `超时 ${fmt(diff)}`, overtime: true });
+        setCountdown({ text: `${fmt(diff)}`, overtime: true });
       }
     };
 
@@ -304,6 +350,19 @@ export default function ShareRepaymentPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {toast && (
+          <div
+            className={`fixed top-4 right-4 z-50 px-4 py-2 rounded shadow-md text-white ${
+              toast.type === "success"
+                ? "bg-green-600"
+                : toast.type === "error"
+                ? "bg-red-600"
+                : "bg-blue-600"
+            }`}
+          >
+            {toast.text}
+          </div>
+        )}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="grid grid-cols-1  gap-4">
             <div className="flex  items-center justify-between">
@@ -322,7 +381,6 @@ export default function ShareRepaymentPage() {
               </span>
             </div>
             <div className="flex flex-col">
-              <div className="text-sm text-gray-600 mb-2">还款进度</div>
               <div className="w-full bg-gray-200 rounded-full h-3 relative overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-blue-500 to-green-500 h-3 rounded-full transition-all duration-1000 ease-out relative"
@@ -346,13 +404,6 @@ export default function ShareRepaymentPage() {
                     %
                   </span>
                 </div>
-              </div>
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>
-                  已还:
-                  {loanInfo.repaid_periods}
-                </span>
-                <span>总期数: {loanInfo.total_periods}</span>
               </div>
             </div>
             <div className="flex flex-col gap-2">
@@ -379,7 +430,10 @@ export default function ShareRepaymentPage() {
                   />
                   <span className="text-sm text-gray-700">支付宝</span>
                 </label>
-                <span className="inline-flex items-center bg-yellow-500 text-white px-2 py-1 rounded-md text-sm">
+                <span
+                  className="inline-flex items-center bg-yellow-500 text-white px-2 py-1 rounded-md text-sm"
+                  onClick={handleAmountClick}
+                >
                   {Math.max(
                     (loanInfo.total_periods || 0) -
                       (loanInfo.repaid_periods || 0),
@@ -421,7 +475,7 @@ export default function ShareRepaymentPage() {
               {orderStatus === "pending" && (
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
-                  <p className="text-blue-600">等待收款人抢单中...</p>
+                  <p className="text-blue-600"> 加载中....</p>
                   <p className="text-sm text-gray-500 mt-1">
                     连接状态: {isConnected ? "已连接" : "连接中..."}
                   </p>

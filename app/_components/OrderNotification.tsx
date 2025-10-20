@@ -31,74 +31,75 @@ export default function OrderNotification({
     success: boolean;
     message?: string;
   } | null>(null);
+  const [adminData, setAdminData] = useState<any>(null);
+  const [isClient, setIsClient] = useState(false);
 
-  // WebSocket连接 - 自动连接，因为收款人需要实时接收订单
+  // 确保在客户端渲染
+  useEffect(() => {
+    setIsClient(true);
+    try {
+      const admin = localStorage.getItem("admin");
+      if (admin) {
+        const parsedAdmin = JSON.parse(admin);
+        console.log("👤 OrderNotification - 管理员信息:", parsedAdmin);
+        setAdminData(parsedAdmin);
+      } else {
+        console.warn("⚠️ OrderNotification - 未找到管理员数据");
+      }
+    } catch (error) {
+      console.error("❌ OrderNotification - 解析管理员数据失败:", error);
+    }
+  }, []);
+
+  // WebSocket连接 - 只有在客户端且有管理员数据时才连接
   const { isConnected, connectionError } = useWebSocket({
-    connections: [
-      {
-        id: "payee-orders",
-        type: "events" as const,
-        url: "/events",
-        queryParams: (() => {
-          try {
-            const adminData = localStorage.getItem("admin");
-            if (adminData) {
-              const admin = JSON.parse(adminData);
-              if (admin.id) {
-                return {
-                  type: "payee",
-                  admin_id: admin.id.toString(),
-                } as Record<string, string>;
-              }
-            }
-          } catch (error) {
-            console.error("Error parsing admin data:", error);
-          }
-          return { type: "payee" } as Record<string, string>;
-        })(),
-      },
-    ],
+    connections:
+      isClient && adminData?.id
+        ? [
+            {
+              id: "payee-orders",
+              type: "events" as const,
+              url: "/events",
+              queryParams: {
+                type: "payee",
+                admin_id: adminData.id.toString(),
+              },
+            },
+          ]
+        : [],
     onOrderMessage: (message) => {
-      console.log("Received order WebSocket message:", message);
+      console.log("📨 OrderNotification - 收到WebSocket消息:", message);
       if (message.type === "new_order") {
         setCurrentOrder(message.data);
         setGrabResult(null);
-        console.log("new_order", message.data);
+        console.log("📋 新订单通知:", message.data);
       } else if (message.type === "connected") {
-        console.log("Order WebSocket connected:", message.data);
+        console.log("✅ OrderNotification - WebSocket连接成功:", message.data);
       }
     },
     autoConnect: true,
   });
 
   const handleGrabOrder = async () => {
-    if (!currentOrder) return;
+    if (!currentOrder || !adminData?.id) {
+      setGrabResult({ success: false, message: "缺少必要信息" });
+      return;
+    }
 
     setIsGrabbing(true);
+    console.log("🎯 开始抢单:", currentOrder.id, "管理员ID:", adminData.id);
 
     try {
-      // 从localStorage获取admin信息
-      const adminData = localStorage.getItem("admin");
-      if (!adminData) {
-        setGrabResult({ success: false, message: "未找到管理员信息" });
-        return;
-      }
-
-      const admin = JSON.parse(adminData);
-      if (!admin.id) {
-        setGrabResult({ success: false, message: "管理员信息无效" });
-        return;
-      }
-
       // 使用POST请求抢单（与后端WebSocket网关配合使用）
       const result = await post("/events", {
         type: "grab_order",
         data: {
           id: currentOrder.id,
-          admin_id: admin.id,
+          admin_id: adminData.id,
         },
       });
 
+      console.log("📊 抢单结果:", result);
       setGrabResult(result.data);
 
       if (result.code == 200) {
@@ -106,6 +107,7 @@ export default function OrderNotification({
         onOrderGrabbed(result.data.id);
       }
     } catch (error) {
+      console.error("❌ 抢单失败:", error);
       setGrabResult({ success: false, message: "抢单失败" });
     } finally {
       setIsGrabbing(false);
@@ -117,6 +119,22 @@ export default function OrderNotification({
     setGrabResult(null);
   };
 
+  // 如果不在客户端或没有管理员数据，不显示组件
+  if (!isClient || !adminData?.id) {
+    return (
+      <div className="fixed top-4 right-4 z-50 max-w-md">
+        <div className="bg-yellow-100 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+            <h3 className="text-sm font-semibold text-yellow-800">
+              {!isClient ? "加载中..." : "等待管理员登录..."}
+            </h3>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!currentOrder) return null;
 
   return (
@@ -124,7 +142,11 @@ export default function OrderNotification({
       <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse mr-2"></div>
+            <div
+              className={`w-3 h-3 rounded-full mr-2 ${
+                isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"
+              }`}
+            ></div>
             <h3 className="text-lg font-semibold text-gray-800">新订单通知</h3>
           </div>
           <button
