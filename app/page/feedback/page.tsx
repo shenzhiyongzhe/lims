@@ -1,5 +1,6 @@
 "use client";
 
+import { get } from "@/lib/http";
 import { useEffect, useState } from "react";
 
 type Feedback = {
@@ -46,10 +47,10 @@ export default function FeedbackPage() {
       if (st) query.set("status", st);
       query.set("page", String(p));
       query.set("pageSize", String(ps));
-      const res = await fetch(`/feedback?${query.toString()}`);
-      const json: Resp = await res.json();
-      if (!res.ok) throw new Error((json as any)?.message || "加载失败");
-      setRows(Array.isArray(json.data) ? json.data : []);
+      const res = await get(`/feedback?${query.toString()}`);
+      if (res.code != 200) throw new Error(res?.message || "加载失败");
+      const json: Resp = res.data;
+      setRows(json.data || []);
       setPage(json.pagination?.page || p);
       setPageSize(json.pagination?.pageSize || ps);
       setTotal(json.pagination?.total || 0);

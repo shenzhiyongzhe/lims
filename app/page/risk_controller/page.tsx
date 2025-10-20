@@ -104,44 +104,30 @@ export default function FrontUsersPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-xl font-semibold text-gray-900">前台用户管理</h2>
-
       <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
         <Link
-          href="/page/customers/my"
+          href="/page/users/management"
           className="px-3 py-4 bg-[#b2e1e6] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           所有客户
         </Link>
         <Link
-          href="/page/customers/my?status=overdue"
+          href="/page/loan/list?status=overdue"
           className="px-3 py-4 bg-[#B6E5D8] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           逾期客户
         </Link>
         <Link
-          href="/page/customers/my?status=paid"
+          href="/page/loan/list?status=paid"
           className="px-3 py-4 bg-[#FBE5C8] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           结清客户
         </Link>
         <Link
-          href="/page/customers/my?status=overtime"
+          href="/page/loan/list?status=overtime"
           className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
         >
           风险客户
-        </Link>
-        <Link
-          href="/page/customers/management"
-          className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
-        >
-          添加用户
-        </Link>
-        <Link
-          href="/page/loan/add"
-          className="px-3 py-4 bg-[#FFC2C7] text-gray-700 rounded-md text-sm flex justify-center items-center cursor-pointer"
-        >
-          添加方案
         </Link>
       </div>
 

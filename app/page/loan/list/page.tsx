@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { get } from "@/lib/http";
 import {
@@ -67,6 +67,7 @@ function InnerScheduleListPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [keyword, setKeyword] = useState("");
   const router = useRouter();
   const search = useSearchParams();
   const urlStatus = (search.get("status") || "pending") as LoanAccountStatus;
@@ -114,39 +115,79 @@ function InnerScheduleListPage() {
     fetchData(p, pageSize, status);
   };
 
+  const headerRight = useMemo(
+    () => (
+      <div className="flex items-center gap-2">
+        <label className="text-sm text-gray-600">状态</label>
+        <select
+          className="border rounded px-2 py-1 text-sm"
+          value={status}
+          onChange={(e) => {
+            const next = e.target.value as LoanAccountStatus;
+            setPage(1);
+            setStatus(next);
+            router.replace(
+              `/page/loan/list?status=${encodeURIComponent(
+                next
+              )}&page=1&pageSize=${pageSize}`
+            );
+            fetchData(1, pageSize, next);
+          }}
+        >
+          {STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={() => fetchData(1, pageSize, status)}
+          className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          disabled={loading}
+        >
+          {loading ? "刷新中..." : "刷新"}
+        </button>
+      </div>
+    ),
+    [status, pageSize, loading]
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-gray-900">还款计划列表</h2>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600">状态</label>
-          <select
-            className="border rounded px-2 py-1 text-sm"
-            value={status}
-            onChange={(e) => {
-              const next = e.target.value as LoanAccountStatus;
-              setPage(1);
-              setStatus(next);
-              router.replace(
-                `/page/loan/list?status=${encodeURIComponent(
-                  next
-                )}&page=1&pageSize=${pageSize}`
-              );
-              fetchData(1, pageSize, next);
-            }}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900">贷款列表</h2>
+          <p className="text-sm text-gray-600">
+            查看贷款方案及状态，筛选并跳转详情
+          </p>
+        </div>
+        {headerRight}
+      </div>
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 w-full sm:max-w-md">
+          <input
+            className="input-base-w"
+            placeholder="搜索用户名或方案ID"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
           <button
+            className="px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
             onClick={() => fetchData(1, pageSize, status)}
-            className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
             disabled={loading}
           >
-            {loading ? "刷新中..." : "刷新"}
+            搜索
+          </button>
+          <button
+            className="px-3 py-2 text-sm border rounded-md hover:bg-gray-50"
+            onClick={() => {
+              setKeyword("");
+              fetchData(1, pageSize, status);
+            }}
+            disabled={loading}
+          >
+            重置
           </button>
         </div>
       </div>
@@ -159,7 +200,7 @@ function InnerScheduleListPage() {
 
       <div className="bg-white border rounded-lg overflow-x-auto">
         <table className="min-w-full text-sm whitespace-nowrap">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
               <th className="text-left px-4 py-2 font-medium text-gray-600 w-16">
                 新/续
@@ -229,7 +270,7 @@ function InnerScheduleListPage() {
                 group.loanAccounts.map((loan, index) => (
                   <tr
                     key={`${group.user.id}-${loan.id}`}
-                    className="border-t text-gray-700"
+                    className="border-t text-gray-700 hover:bg-gray-50/60"
                   >
                     <td className="px-4 py-2 whitespace-nowrap">
                       <span

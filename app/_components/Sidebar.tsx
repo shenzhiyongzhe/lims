@@ -40,13 +40,13 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/page/users/management",
-    label: "客户管理",
+    label: "客户方案",
     icon: "users",
     roles: ["收款人", "负责人", "风控人"],
   },
   {
     href: "/page/users/list",
-    label: "客户列表",
+    label: "客户信息",
     icon: "list",
     roles: ["收款人", "负责人", "风控人"],
   },
@@ -58,7 +58,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/page/loan/add",
-    label: "添加贷款计划",
+    label: "添加贷款",
     icon: "plus",
     roles: ["管理员", "风控人"],
   },

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { get } from "@/lib/http";
 import {
@@ -19,6 +19,16 @@ import {
   PaginationPrevious,
   PaginationEllipsis,
 } from "@/components/ui/pagination";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 type User = {
   id: number;
@@ -49,12 +59,15 @@ export default function UsersListPage() {
     hasPrev: false,
   });
   const [loading, setLoading] = useState(false);
+  const [keyword, setKeyword] = useState("");
 
-  const fetchUsers = async (page = 1) => {
+  const fetchUsers = async (page = 1, kw = keyword) => {
     setLoading(true);
     try {
       const res = await get(
-        `/users?page=${page}&pageSize=${pagination.pageSize}`
+        `/users?page=${page}&pageSize=${
+          pagination.pageSize
+        }&search=${encodeURIComponent(kw)}`
       );
       if (res.code === 200) {
         setData(res.data.data || []);
@@ -78,6 +91,7 @@ export default function UsersListPage() {
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePageChange = (newPage: number) => {
@@ -153,91 +167,136 @@ export default function UsersListPage() {
     return items;
   };
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">用户列表</h1>
+  const headerRight = useMemo(
+    () => (
+      <div className="flex items-center gap-3">
         <div className="text-sm text-muted-foreground">
           共 {pagination.total} 个用户
         </div>
       </div>
+    ),
+    [pagination.total]
+  );
 
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>用户名</TableHead>
-              <TableHead>手机号</TableHead>
-              <TableHead>地址</TableHead>
-              <TableHead>等级</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
-                  加载中...
-                </TableCell>
-              </TableRow>
-            ) : data.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  暂无用户数据
-                </TableCell>
-              </TableRow>
-            ) : (
-              data.map((user) => (
-                <TableRow
-                  key={user.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                >
-                  <TableCell>{user.id}</TableCell>
-                  <TableCell className="font-medium">{user.username}</TableCell>
-                  <TableCell>{user.phone}</TableCell>
-                  <TableCell className="max-w-xs truncate">
-                    {user.address}
-                  </TableCell>
-                  <TableCell>{user.lv}</TableCell>
+  return (
+    <div className="p-6 space-y-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle>用户列表</CardTitle>
+              <CardDescription>查看并管理系统中的客户信息</CardDescription>
+            </div>
+            {headerRight}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Toolbar */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 w-full sm:max-w-md">
+              <Input
+                placeholder="搜索用户名或手机号"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+              />
+              <Button onClick={() => fetchUsers(1, keyword)} disabled={loading}>
+                搜索
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setKeyword("");
+                  fetchUsers(1, "");
+                }}
+                disabled={loading}
+              >
+                重置
+              </Button>
+            </div>
+          </div>
+
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-gray-50/60 sticky top-0 z-10">
+                  <TableHead className="w-16">ID</TableHead>
+                  <TableHead>用户名</TableHead>
+                  <TableHead>手机号</TableHead>
+                  <TableHead>地址</TableHead>
+                  <TableHead className="w-24">等级</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      加载中...
+                    </TableCell>
+                  </TableRow>
+                ) : data.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center py-8 text-muted-foreground"
+                    >
+                      暂无用户数据
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data.map((user) => (
+                    <TableRow
+                      key={user.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
+                      <TableCell>{user.id}</TableCell>
+                      <TableCell className="font-medium">
+                        {user.username}
+                      </TableCell>
+                      <TableCell>{user.phone}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {user.address}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{user.lv}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-      {pagination.totalPages > 1 && (
-        <Pagination>
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={() => handlePageChange(pagination.page - 1)}
-                className={
-                  !pagination.hasPrev
-                    ? "pointer-events-none opacity-50"
-                    : "cursor-pointer"
-                }
-              />
-            </PaginationItem>
+          {pagination.totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    className={
+                      !pagination.hasPrev
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
 
-            {renderPaginationItems()}
+                {renderPaginationItems()}
 
-            <PaginationItem>
-              <PaginationNext
-                onClick={() => handlePageChange(pagination.page + 1)}
-                className={
-                  !pagination.hasNext
-                    ? "pointer-events-none opacity-50"
-                    : "cursor-pointer"
-                }
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      )}
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    className={
+                      !pagination.hasNext
+                        ? "pointer-events-none opacity-50"
+                        : "cursor-pointer"
+                    }
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
